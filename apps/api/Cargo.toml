@@ -20,6 +20,10 @@ time = "0.3"
 uuid = "1"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "json", "uuid", "time"] }
 tracing = "0.1"
+argon2 = { version = "0.5", features = ["std"] }
+sha2 = "0.10"
+rand = "0.8"
+base64 = "0.22"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 domain = { path = "crates/domain" }

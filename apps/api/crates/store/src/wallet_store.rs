@@ -98,39 +98,60 @@ impl WalletStore {
         expected: Version,
         rows: &[(i64, StoredBody)],
     ) -> Result<Version, StoreError> {
-        let family_id = wallet.family_id().as_uuid();
-        let wallet_id = wallet.id().as_uuid();
         let mut tx = self.pool.begin().await?;
-
-        let (current,): (Option<i64>,) =
-            sqlx::query_as("select max(sequence) from ledger_events where wallet_id = $1")
-                .bind(wallet_id)
-                .fetch_one(&mut *tx)
-                .await?;
-        if current.unwrap_or(0) != expected.sequence() {
-            return Err(StoreError::Conflict);
-        }
-        // Two saves at the same Version both pass the check above; the primary key
-        // (wallet_id, sequence) lets only the first one commit.
-        for (sequence, stored) in rows {
-            sqlx::query(
-                "insert into ledger_events (family_id, wallet_id, sequence, kind, body)
-                 values ($1, $2, $3, $4, $5)",
-            )
-            .bind(family_id)
-            .bind(wallet_id)
-            .bind(sequence)
-            .bind(&stored.kind)
-            .bind(&stored.body)
-            .execute(&mut *tx)
-            .await?;
-        }
+        let version = insert_events(&mut tx, wallet, expected, rows).await?;
         tx.commit().await?;
-
-        Ok(rows
-            .last()
-            .map_or(expected, |(sequence, _)| Version::from_sequence(*sequence)))
+        Ok(version)
     }
+}
+
+/// Saves a new Wallet's first Event inside a caller's database transaction, so that it
+/// commits together with something else (a Kid being added, ADR-0010).
+pub(crate) async fn open_in(
+    tx: &mut sqlx::PgConnection,
+    opened: &WalletEvent,
+) -> Result<Version, StoreError> {
+    let wallet = Wallet::replay([opened])?;
+    let rows = encode_from(Version::NONE, std::slice::from_ref(opened))?;
+    insert_events(tx, &wallet, Version::NONE, &rows).await
+}
+
+async fn insert_events(
+    tx: &mut sqlx::PgConnection,
+    wallet: &Wallet,
+    expected: Version,
+    rows: &[(i64, StoredBody)],
+) -> Result<Version, StoreError> {
+    let family_id = wallet.family_id().as_uuid();
+    let wallet_id = wallet.id().as_uuid();
+
+    let (current,): (Option<i64>,) =
+        sqlx::query_as("select max(sequence) from ledger_events where wallet_id = $1")
+            .bind(wallet_id)
+            .fetch_one(&mut *tx)
+            .await?;
+    if current.unwrap_or(0) != expected.sequence() {
+        return Err(StoreError::Conflict);
+    }
+    // Two saves at the same Version both pass the check above; the primary key
+    // (wallet_id, sequence) lets only the first one commit.
+    for (sequence, stored) in rows {
+        sqlx::query(
+            "insert into ledger_events (family_id, wallet_id, sequence, kind, body)
+             values ($1, $2, $3, $4, $5)",
+        )
+        .bind(family_id)
+        .bind(wallet_id)
+        .bind(sequence)
+        .bind(&stored.kind)
+        .bind(&stored.body)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    Ok(rows
+        .last()
+        .map_or(expected, |(sequence, _)| Version::from_sequence(*sequence)))
 }
 
 fn encode_from(
