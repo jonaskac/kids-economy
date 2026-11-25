@@ -254,7 +254,12 @@ async fn every_kind_of_event_survives_the_round_trip(pool: PgPool) {
     record(
         &store,
         wallet_id(500),
-        WalletCommand::CloseAccount { account_id: lego },
+        WalletCommand::CloseAccount {
+            account_id: lego,
+            move_to: None,
+            memo: Memo::new("Lego closed").expect("memo"),
+            occurred_on: date!(2026 - 11 - 25),
+        },
         &mut ids,
     )
     .await

@@ -1238,3 +1238,252 @@ async fn account_and_goal_names_stay_within_40_letters(pool: PgPool) {
     assert_eq!(long_goal.status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(long_goal.json["error"], "invalid_text");
 }
+
+// ---------- editing, hiding and removing Kids ----------
+
+async fn kid_id(app: &App, cookie: &str, family: &str, name: &str) -> String {
+    let added = app
+        .post(
+            &format!("/api/families/{family}/kids"),
+            cookie,
+            json!({ "name": name }),
+        )
+        .await;
+    assert_eq!(added.status, StatusCode::CREATED, "{}", added.json);
+    added.json["id"].as_str().expect("id").to_owned()
+}
+
+async fn patch(app: &App, path: &str, cookie: &str, body: Value) -> Reply {
+    app.send(Method::PATCH, path, Some(cookie), Some(body))
+        .await
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn a_parent_fixes_a_kids_name(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let kid = kid_id(&app, &owner, &family, "Ellsa").await;
+
+    let renamed = patch(
+        &app,
+        &format!("/api/families/{family}/kids/{kid}"),
+        &owner,
+        json!({ "name": "  Elsa " }),
+    )
+    .await;
+    assert_eq!(renamed.status, StatusCode::NO_CONTENT, "{}", renamed.json);
+    let view = app.get(&format!("/api/families/{family}"), &owner).await;
+    assert_eq!(view.json["kids"][0]["name"], "Elsa");
+
+    let blank = patch(
+        &app,
+        &format!("/api/families/{family}/kids/{kid}"),
+        &owner,
+        json!({ "name": " " }),
+    )
+    .await;
+    assert_eq!(blank.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(blank.json["error"], "invalid_text");
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn a_hidden_kid_is_marked_and_their_wallet_still_works(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let kid = kid_id(&app, &owner, &family, "Elsa").await;
+
+    let hidden = patch(
+        &app,
+        &format!("/api/families/{family}/kids/{kid}"),
+        &owner,
+        json!({ "hidden": true }),
+    )
+    .await;
+    assert_eq!(hidden.status, StatusCode::NO_CONTENT, "{}", hidden.json);
+    let view = app.get(&format!("/api/families/{family}"), &owner).await;
+    let elsa = &view.json["kids"][0];
+    assert_eq!(elsa["hidden"], true, "hidden Kids are still listed, marked");
+    let wallet = format!(
+        "/api/families/{family}/wallets/{}",
+        elsa["wallet_id"].as_str().expect("wallet")
+    );
+    let deposited = app
+        .post(
+            &format!("{wallet}/deposits"),
+            &owner,
+            json!({ "amount": sek(500), "category": "gift", "memo": "Birthday" }),
+        )
+        .await;
+    assert_eq!(deposited.status, StatusCode::CREATED, "{}", deposited.json);
+
+    patch(
+        &app,
+        &format!("/api/families/{family}/kids/{kid}"),
+        &owner,
+        json!({ "hidden": false }),
+    )
+    .await;
+    let view = app.get(&format!("/api/families/{family}"), &owner).await;
+    assert_eq!(view.json["kids"][0]["hidden"], false);
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn a_viewer_cannot_edit_or_hide_a_kid_and_removed_kids_are_gone(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let kid = kid_id(&app, &owner, &family, "Elsa").await;
+    let viewer = app
+        .join(&owner, &family, "viewer@example.com", "viewer")
+        .await;
+    let path = format!("/api/families/{family}/kids/{kid}");
+
+    let refused = patch(&app, &path, &viewer, json!({ "name": "Sneaky" })).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    let refused = patch(&app, &path, &viewer, json!({ "hidden": true })).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+
+    app.post(&format!("{path}/archive"), &owner, json!({}))
+        .await;
+    let gone = patch(&app, &path, &owner, json!({ "name": "Elsa" })).await;
+    assert_eq!(gone.status, StatusCode::CONFLICT);
+    assert_eq!(gone.json["error"], "kid_archived");
+}
+
+// ---------- closing Accounts ----------
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn closing_an_account_moves_its_money_to_the_main_account(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+    let opened = app
+        .post(
+            &format!("{wallet}/accounts"),
+            &owner,
+            json!({ "name": "Lego set" }),
+        )
+        .await;
+    let lego = account_named(&opened.json, "Lego set")["id"]
+        .as_str()
+        .expect("id")
+        .to_owned();
+    app.post(
+        &format!("{wallet}/deposits"),
+        &owner,
+        json!({ "account_id": lego, "amount": sek(3000), "category": "gift", "memo": "Mormor" }),
+    )
+    .await;
+
+    let closed = app
+        .post(
+            &format!("{wallet}/accounts/{lego}/close"),
+            &owner,
+            json!({ "memo": "Lego set closed" }),
+        )
+        .await;
+    assert_eq!(closed.status, StatusCode::CREATED, "{}", closed.json);
+    assert_eq!(closed.json["total"], sek(3000), "the total stays");
+    assert_eq!(closed.json["accounts"].as_array().map(Vec::len), Some(1));
+    assert_eq!(account_named(&closed.json, "Main")["balance"], sek(3000));
+    assert_eq!(
+        closed.json["closed_accounts"],
+        json!([{ "id": lego, "name": "Lego set" }]),
+        "closed Accounts are kept so their history can name them"
+    );
+    let newest = &closed.json["transactions"][0];
+    assert_eq!(newest["category"], "transfer");
+    assert_eq!(newest["memo"], "Lego set closed");
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn closing_an_account_can_move_its_money_to_a_chosen_account(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+    app.post(
+        &format!("{wallet}/accounts"),
+        &owner,
+        json!({ "name": "Jar" }),
+    )
+    .await;
+    let opened = app
+        .post(
+            &format!("{wallet}/accounts"),
+            &owner,
+            json!({ "name": "Bike" }),
+        )
+        .await;
+    let jar = account_named(&opened.json, "Jar")["id"].clone();
+    let bike = account_named(&opened.json, "Bike")["id"].clone();
+    app.post(
+        &format!("{wallet}/deposits"),
+        &owner,
+        json!({ "account_id": jar, "amount": sek(700), "category": "chore", "memo": "Dishes" }),
+    )
+    .await;
+
+    let into_itself = app
+        .post(
+            &format!("{wallet}/accounts/{}/close", jar.as_str().expect("id")),
+            &owner,
+            json!({ "move_to": jar, "memo": "Jar closed" }),
+        )
+        .await;
+    assert_eq!(into_itself.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(into_itself.json["error"], "same_account");
+
+    let closed = app
+        .post(
+            &format!("{wallet}/accounts/{}/close", jar.as_str().expect("id")),
+            &owner,
+            json!({ "move_to": bike, "memo": "Jar closed" }),
+        )
+        .await;
+    assert_eq!(closed.status, StatusCode::CREATED, "{}", closed.json);
+    assert_eq!(account_named(&closed.json, "Bike")["balance"], sek(700));
+    assert_eq!(account_named(&closed.json, "Main")["balance"], sek(0));
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn the_main_account_never_closes_and_a_viewer_closes_nothing(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+    let opened = app
+        .post(
+            &format!("{wallet}/accounts"),
+            &owner,
+            json!({ "name": "Jar" }),
+        )
+        .await;
+    let main = account_named(&opened.json, "Main")["id"]
+        .as_str()
+        .expect("id")
+        .to_owned();
+    let jar = account_named(&opened.json, "Jar")["id"]
+        .as_str()
+        .expect("id")
+        .to_owned();
+
+    let main_close = app
+        .post(
+            &format!("{wallet}/accounts/{main}/close"),
+            &owner,
+            json!({ "memo": "Main closed" }),
+        )
+        .await;
+    assert_eq!(main_close.status, StatusCode::CONFLICT);
+    assert_eq!(main_close.json["error"], "main_account");
+
+    let viewer = app
+        .join(&owner, &family, "viewer@example.com", "viewer")
+        .await;
+    let refused = app
+        .post(
+            &format!("{wallet}/accounts/{jar}/close"),
+            &viewer,
+            json!({ "memo": "Jar closed" }),
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+}

@@ -52,6 +52,7 @@ fn family() -> Family {
             name: KidName::new("Elsa").expect("name"),
             wallet_id: WalletId::from_uuid(id(6)),
             added_at: at,
+            hidden: true,
             archived_at: Some(at),
         }],
     })
@@ -92,10 +93,22 @@ fn the_v1_family_shape_is_pinned() {
             }],
             "kids": [{
                 "id": id(5), "name": "Elsa", "wallet_id": id(6),
-                "added_at": "2026-11-25T13:00:00Z", "archived_at": "2026-11-25T13:00:00Z"
+                "added_at": "2026-11-25T13:00:00Z", "hidden": true,
+                "archived_at": "2026-11-25T13:00:00Z"
             }]
         })
     );
+}
+
+#[test]
+fn a_kid_stored_before_hiding_existed_is_shown() {
+    let mut body = encode_family(&family()).expect("encode");
+    body["kids"][0]
+        .as_object_mut()
+        .expect("kid")
+        .remove("hidden");
+    let decoded = decode_family(id(900), body).expect("decode");
+    assert!(!decoded.kid(KidId::from_uuid(id(5))).expect("kid").hidden);
 }
 
 #[test]

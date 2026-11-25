@@ -186,6 +186,16 @@ fn correct(transaction_id: TransactionId) -> WalletCommand {
     }
 }
 
+/// Closes `account`, moving what is left to `move_to` (`None`: the Main account).
+fn close(account: AccountId, move_to: Option<AccountId>) -> WalletCommand {
+    WalletCommand::CloseAccount {
+        account_id: account,
+        move_to,
+        memo: memo("Jar closed"),
+        occurred_on: date!(2026 - 11 - 25),
+    }
+}
+
 fn goal(target: Amount) -> SavingsGoal {
     SavingsGoal {
         name: name("Lego set"),
@@ -290,8 +300,7 @@ fn a_deposit_to_an_unknown_account_is_rejected() {
 fn a_deposit_to_a_closed_account_is_rejected() {
     let mut fx = Fixture::new();
     let jar = fx.open_account("Old jar");
-    fx.run(WalletCommand::CloseAccount { account_id: jar })
-        .expect("close");
+    fx.run(close(jar, None)).expect("close");
     assert_eq!(
         fx.deposit(Some(jar), kr(1)),
         Err(WalletError::AccountClosed)
@@ -413,8 +422,7 @@ fn a_transfer_that_would_overdraw_the_source_records_neither_leg() {
 fn a_transfer_needs_two_open_accounts_of_this_wallet() {
     let mut fx = Fixture::new();
     let jar = fx.open_account("Old jar");
-    fx.run(WalletCommand::CloseAccount { account_id: jar })
-        .expect("close");
+    fx.run(close(jar, None)).expect("close");
     fx.deposit(None, kr(10)).expect("deposit");
     assert_eq!(
         fx.run(transfer(fx.main(), jar, kr(1))),
@@ -558,34 +566,122 @@ fn removing_a_savings_goal_makes_it_a_plain_account() {
 }
 
 #[test]
-fn an_account_closes_only_at_zero_balance() {
+fn closing_an_empty_account_records_only_the_closing() {
     let mut fx = Fixture::new();
     let jar = fx.open_account("Jar");
-    fx.deposit(Some(jar), kr(5)).expect("deposit");
+    let events = fx.run(close(jar, None)).expect("close");
     assert_eq!(
-        fx.run(WalletCommand::CloseAccount { account_id: jar }),
-        Err(WalletError::NonZeroBalance)
+        events,
+        vec![WalletEvent::AccountClosed {
+            account_id: jar,
+            closed_at: NOW
+        }]
     );
-    fx.run(transfer(jar, fx.main(), kr(5)))
-        .expect("move the money out first");
-    fx.run(WalletCommand::CloseAccount { account_id: jar })
-        .expect("close");
     let account = fx.wallet.account(jar).expect("closed accounts are kept");
     assert_eq!(account.closed_at(), Some(NOW));
-    assert_eq!(account.ledger().len(), 2, "history stays");
     assert_eq!(
-        fx.run(WalletCommand::CloseAccount { account_id: jar }),
+        fx.run(close(jar, None)),
+        Err(WalletError::AccountClosed),
+        "an Account closes once"
+    );
+}
+
+#[test]
+fn closing_an_account_moves_its_balance_to_the_main_account_with_a_transfer() {
+    let mut fx = Fixture::new();
+    let jar = fx.open_account("Jar");
+    fx.deposit(Some(jar), kr(30)).expect("deposit");
+    let events = fx.run(close(jar, None)).expect("close");
+
+    let [WalletEvent::TransferRecorded { out_leg, in_leg }, WalletEvent::AccountClosed { account_id, .. }] =
+        events.as_slice()
+    else {
+        panic!("unexpected events {events:?}");
+    };
+    assert_eq!(*account_id, jar);
+    assert_eq!(
+        (out_leg.account_id(), out_leg.direction(), out_leg.amount()),
+        (jar, Direction::Out, kr(30))
+    );
+    assert_eq!(
+        (in_leg.account_id(), in_leg.direction(), in_leg.amount()),
+        (fx.main(), Direction::In, kr(30))
+    );
+    assert_eq!(out_leg.category(), Category::Transfer);
+    assert_eq!(out_leg.memo(), &memo("Jar closed"));
+    assert_eq!(out_leg.transfer_id(), in_leg.transfer_id());
+    assert!(out_leg.transfer_id().is_some());
+
+    assert_eq!(fx.balance(jar), 0);
+    assert_eq!(fx.balance(fx.main()), 3000);
+    assert_eq!(fx.total(), 3000, "closing never changes the Wallet total");
+    assert_eq!(
+        fx.wallet.account(jar).expect("kept").ledger().len(),
+        2,
+        "history stays"
+    );
+}
+
+#[test]
+fn closing_an_account_can_move_its_balance_to_another_open_account() {
+    let mut fx = Fixture::new();
+    let jar = fx.open_account("Jar");
+    let bike = fx.open_account("Bike");
+    fx.deposit(Some(jar), kr(12)).expect("deposit");
+    fx.run(close(jar, Some(bike))).expect("close");
+    assert_eq!(fx.balance(bike), 1200);
+    assert_eq!(fx.balance(fx.main()), 0);
+    assert!(fx.wallet.account(jar).expect("kept").is_closed());
+}
+
+#[test]
+fn the_balance_must_go_to_another_open_account_of_this_wallet() {
+    let mut fx = Fixture::new();
+    let jar = fx.open_account("Jar");
+    let old = fx.open_account("Old");
+    fx.run(close(old, None)).expect("close old");
+    fx.deposit(Some(jar), kr(5)).expect("deposit");
+    let stranger = AccountId::from_uuid(Uuid::from_u128(77_777));
+    assert_eq!(fx.run(close(jar, Some(jar))), Err(WalletError::SameAccount));
+    assert_eq!(
+        fx.run(close(jar, Some(old))),
         Err(WalletError::AccountClosed)
     );
+    assert_eq!(
+        fx.run(close(jar, Some(stranger))),
+        Err(WalletError::UnknownAccount)
+    );
+    assert!(
+        !fx.wallet.account(jar).expect("jar").is_closed(),
+        "nothing changed"
+    );
+    assert_eq!(fx.balance(jar), 500);
+}
+
+#[test]
+fn moving_the_balance_into_a_savings_account_can_reach_its_goal() {
+    let mut fx = Fixture::new();
+    let jar = fx.open_account("Jar");
+    let lego = fx.open_account("Lego");
+    fx.run(WalletCommand::SetSavingsGoal {
+        account_id: lego,
+        savings_goal: Some(goal(kr(40))),
+    })
+    .expect("goal");
+    fx.deposit(Some(jar), kr(40)).expect("deposit");
+    let events = fx.run(close(jar, Some(lego))).expect("close");
+    assert!(events.contains(&WalletEvent::SavingsGoalReached { account_id: lego }));
+    assert!(matches!(
+        events.last(),
+        Some(WalletEvent::AccountClosed { .. })
+    ));
 }
 
 #[test]
 fn the_main_account_cannot_be_closed() {
     let mut fx = Fixture::new();
     assert_eq!(
-        fx.run(WalletCommand::CloseAccount {
-            account_id: fx.main()
-        }),
+        fx.run(close(fx.main(), None)),
         Err(WalletError::MainAccount)
     );
 }
@@ -724,7 +820,7 @@ fn a_viewer_can_change_nothing() {
             account_id: lego,
             savings_goal: None,
         },
-        WalletCommand::CloseAccount { account_id: lego },
+        close(lego, None),
     ];
     for command in commands {
         assert_eq!(

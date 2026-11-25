@@ -277,9 +277,36 @@ impl Family {
                         name: name.clone(),
                         wallet_id: WalletId::from_uuid(ids.next_id()),
                         added_at: now,
+                        hidden: false,
                         archived_at: None,
                     },
                 }])
+            }
+            FamilyCommand::RenameKid { kid_id, name } => {
+                ensure(actor.role.may_manage_kids())?;
+                self.active_kid(*kid_id)?;
+                Ok(vec![FamilyEvent::KidRenamed {
+                    kid_id: *kid_id,
+                    name: name.clone(),
+                }])
+            }
+            FamilyCommand::HideKid { kid_id } => {
+                ensure(actor.role.may_manage_kids())?;
+                let kid = self.active_kid(*kid_id)?;
+                Ok(if kid.hidden {
+                    Vec::new()
+                } else {
+                    vec![FamilyEvent::KidHidden { kid_id: *kid_id }]
+                })
+            }
+            FamilyCommand::ShowKid { kid_id } => {
+                ensure(actor.role.may_manage_kids())?;
+                let kid = self.active_kid(*kid_id)?;
+                Ok(if kid.hidden {
+                    vec![FamilyEvent::KidShown { kid_id: *kid_id }]
+                } else {
+                    Vec::new()
+                })
             }
             FamilyCommand::ArchiveKid { kid_id } => {
                 ensure(actor.role.may_manage_kids())?;
@@ -369,15 +396,16 @@ impl Family {
                 }
                 self.kids.push(kid.clone());
             }
+            FamilyEvent::KidRenamed { kid_id, name } => {
+                self.kid_mut(*kid_id)?.name = name.clone();
+            }
+            FamilyEvent::KidHidden { kid_id } => self.kid_mut(*kid_id)?.hidden = true,
+            FamilyEvent::KidShown { kid_id } => self.kid_mut(*kid_id)?.hidden = false,
             FamilyEvent::KidArchived {
                 kid_id,
                 archived_at,
             } => {
-                self.kids
-                    .iter_mut()
-                    .find(|k| k.id == *kid_id)
-                    .ok_or(FamilyReplayError::Unknown)?
-                    .archived_at = Some(*archived_at);
+                self.kid_mut(*kid_id)?.archived_at = Some(*archived_at);
             }
         }
         Ok(())
@@ -400,6 +428,15 @@ impl Family {
         self.active_members()
             .find(|m| m.id == id)
             .ok_or(FamilyError::UnknownMember)
+    }
+
+    fn active_kid(&self, id: KidId) -> Result<&Kid, FamilyError> {
+        let kid = self.kid(id).ok_or(FamilyError::UnknownKid)?;
+        if kid.is_active() {
+            Ok(kid)
+        } else {
+            Err(FamilyError::KidArchived)
+        }
     }
 
     fn active_owners(&self) -> usize {
@@ -428,6 +465,13 @@ impl Family {
         self.members
             .iter_mut()
             .find(|m| m.id == id)
+            .ok_or(FamilyReplayError::Unknown)
+    }
+
+    fn kid_mut(&mut self, id: KidId) -> Result<&mut Kid, FamilyReplayError> {
+        self.kids
+            .iter_mut()
+            .find(|k| k.id == id)
             .ok_or(FamilyReplayError::Unknown)
     }
 

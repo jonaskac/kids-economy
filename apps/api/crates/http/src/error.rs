@@ -125,7 +125,7 @@ fn wallet_status(error: WalletError) -> (StatusCode, &'static str) {
         WalletError::SameAccount => (S::UNPROCESSABLE_ENTITY, "same_account"),
         WalletError::InsufficientFunds => (S::UNPROCESSABLE_ENTITY, "insufficient_funds"),
         WalletError::TotalOverflow => (S::UNPROCESSABLE_ENTITY, "total_too_large"),
-        WalletError::NonZeroBalance => (S::CONFLICT, "balance_not_zero"),
+        WalletError::Corrupt => (S::INTERNAL_SERVER_ERROR, "internal"),
         WalletError::MainAccount => (S::CONFLICT, "main_account"),
         WalletError::AlreadyCorrected => (S::CONFLICT, "already_corrected"),
     }

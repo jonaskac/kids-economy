@@ -40,7 +40,8 @@ Families, Invitations and Kids (ADR-0010, ADR-0011); Password reset links follow
 | 🔒 `DELETE /api/families/{id}/members/{member_id}` | | `204` (yourself: leave) | `403`, `404 unknown_member`, `409 last_owner` |
 | 🔒 `POST /api/families/{id}/members/{member_id}/password-reset` | `{}` | `201 {link, expires_at}`; see Password reset links | `403` (not Owner), `404 unknown_member` |
 | 🔒 `POST /api/families/{id}/kids` | `{name}` | `201 {id, name, wallet_id}`; the Wallet opens with a Main account | `403` (Viewer), `422 invalid_text` |
-| 🔒 `POST /api/families/{id}/kids/{kid_id}/archive` | `{}` | `204` | `403`, `404 unknown_kid`, `409 kid_archived` |
+| 🔒 `PATCH /api/families/{id}/kids/{kid_id}` | `{name?, hidden?}`; fixes the name and hides or shows the Kid on the Family home, all or nothing | `204` | `403` (Viewer), `404 unknown_kid`, `409 kid_archived`, `422 invalid_text` |
+| 🔒 `POST /api/families/{id}/kids/{kid_id}/archive` | `{}`; "Remove kid": the Kid and Wallet are kept but no longer active | `204` | `403`, `404 unknown_kid`, `409 kid_archived` |
 
 ```json
 {
@@ -48,12 +49,13 @@ Families, Invitations and Kids (ADR-0010, ADR-0011); Password reset links follow
   "you": { "member_id": "…", "role": "owner" },
   "members": [{ "id": "…", "name": "Jonas", "email": "jonas@example.com", "role": "owner", "joined_at": "2026-11-25T13:00:00Z" }],
   "invitations": [{ "id": "…", "email": "mormor@example.com", "role": "viewer", "expires_at": "2026-12-02T13:00:00Z" }],
-  "kids": [{ "id": "…", "name": "Elsa", "wallet_id": "…", "wallet_total": { "minor": 0, "currency": "SEK" } }]
+  "kids": [{ "id": "…", "name": "Elsa", "wallet_id": "…", "hidden": false, "wallet_total": { "minor": 0, "currency": "SEK" } }]
 }
 ```
 
 `members` lists active Members; `invitations` lists pending ones and is empty for
-non-Owners; `kids` lists active Kids.
+non-Owners; `kids` lists active Kids, hidden ones too (`hidden: true`; the app leaves them
+off the Family home). Archived Kids are not listed (ADR-0013).
 
 ## Wallets
 
@@ -70,19 +72,22 @@ read; changes by a Viewer answer `403 not_allowed`. Dates are `YYYY-MM-DD` and d
 | 🔒 `POST …/transfers` | `{from, to, amount, memo, occurred_on?}` | as above, plus `422 same_account` |
 | 🔒 `POST …/corrections` | `{transaction_id, reason, occurred_on?}`; `reason` becomes the Correction's Memo; correcting one side of a Transfer corrects both | `404 unknown_transaction`; `409 already_corrected`; `422 invalid_text`, `insufficient_funds` (the reversal would overdraw) |
 | 🔒 `POST …/accounts` | `{name, savings_goal?: {name, target, target_date?}}` | `422 invalid_text`, `currency_mismatch` |
+| 🔒 `POST …/accounts/{account_id}/close` | `{move_to?, memo, occurred_on?}`; what is left moves to `move_to` (default: the Main account) as one Transfer with `memo`, then the Account closes (ADR-0013) | `404 unknown_account`; `409 main_account`, `account_closed` (either Account); `422 same_account`, `invalid_text` |
 
 ```json
 {
   "id": "…", "kid": { "id": "…", "name": "Elsa" }, "currency": "SEK",
   "total": { "minor": 3000, "currency": "SEK" },
   "accounts": [{ "id": "…", "name": "Main", "main": true, "balance": { "minor": 2000, "currency": "SEK" }, "savings_goal": null }],
+  "closed_accounts": [{ "id": "…", "name": "Lego set" }],
   "transactions": [{ "id": "…", "account_id": "…", "direction": "in", "amount": { "minor": 3000, "currency": "SEK" },
     "category": "gift", "memo": "From mormor", "occurred_on": "2026-11-25", "recorded_at": "2026-11-25T13:00:00Z",
     "transfer_id": null, "corrects": null }]
 }
 ```
 
-`accounts` lists open Accounts, Main first. `transactions` lists every Transaction on every
+`accounts` lists open Accounts, Main first; `closed_accounts` lists closed ones, so their
+Transactions can still be named. `transactions` lists every Transaction on every
 Account, newest first; the two sides of a Transfer share a `transfer_id`.
 
 ## Invitation links

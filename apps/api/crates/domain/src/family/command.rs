@@ -46,6 +46,20 @@ pub enum FamilyCommand {
     AddKid {
         name: KidName,
     },
+    /// Fixes a Kid's name entered by mistake. Their Wallet stays the same.
+    RenameKid {
+        kid_id: KidId,
+        name: KidName,
+    },
+    /// Hides a Kid from the Family home; their Wallet keeps working (ADR-0013).
+    HideKid {
+        kid_id: KidId,
+    },
+    /// Shows a hidden Kid on the Family home again.
+    ShowKid {
+        kid_id: KidId,
+    },
+    /// "Remove kid" in the app: the Kid and their Wallet are kept, but no longer active.
     ArchiveKid {
         kid_id: KidId,
     },

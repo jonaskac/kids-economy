@@ -172,19 +172,12 @@ impl Wallet {
                 }
                 Ok(events)
             }
-            WalletCommand::CloseAccount { account_id } => {
-                let account = self.open_account(*account_id)?;
-                if account.is_main {
-                    return Err(WalletError::MainAccount);
-                }
-                if !account.balance().is_zero() {
-                    return Err(WalletError::NonZeroBalance);
-                }
-                Ok(vec![WalletEvent::AccountClosed {
-                    account_id: *account_id,
-                    closed_at: context.now,
-                }])
-            }
+            WalletCommand::CloseAccount {
+                account_id,
+                move_to,
+                memo,
+                occurred_on,
+            } => self.decide_closing(*account_id, *move_to, memo, *occurred_on, context, ids),
             WalletCommand::Deposit {
                 account_id,
                 amount,
@@ -337,6 +330,46 @@ impl Wallet {
     }
 
     // ---------- rules ----------
+
+    fn decide_closing(
+        &self,
+        account_id: AccountId,
+        move_to: Option<AccountId>,
+        memo: &Memo,
+        occurred_on: Date,
+        context: &Context,
+        ids: &mut impl NewIds,
+    ) -> Result<Vec<WalletEvent>, WalletError> {
+        let account = self.open_account(account_id)?;
+        if account.is_main {
+            return Err(WalletError::MainAccount);
+        }
+        let target = move_to.unwrap_or(self.main_account_id);
+        if target == account_id {
+            return Err(WalletError::SameAccount);
+        }
+        self.open_account(target)?;
+        let mut events = Vec::new();
+        let left = account.balance();
+        if !left.is_zero() {
+            // Whatever is left moves out as one Transfer: the Wallet total stays.
+            let amount =
+                Amount::new(left.minor(), left.currency()).map_err(|_| WalletError::Corrupt)?;
+            let transfer = WalletCommand::Transfer {
+                from: account_id,
+                to: target,
+                amount,
+                memo: memo.clone(),
+                occurred_on,
+            };
+            events = self.decide(&transfer, context, ids)?;
+        }
+        events.push(WalletEvent::AccountClosed {
+            account_id,
+            closed_at: context.now,
+        });
+        Ok(events)
+    }
 
     fn decide_correction(
         &self,

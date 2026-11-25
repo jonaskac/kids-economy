@@ -670,6 +670,99 @@ fn an_archived_kid_is_kept_but_not_active() {
     );
 }
 
+#[test]
+fn a_kid_entered_wrong_can_be_renamed() {
+    let mut f = Fixture::new();
+    let owner = f.owner();
+    let elsa = f.add_kid(owner, "Ellsa").expect("added");
+    let events = f.decide(
+        owner,
+        FamilyCommand::RenameKid {
+            kid_id: elsa.id,
+            name: KidName::new("Elsa").expect("name"),
+        },
+    );
+    assert_eq!(
+        events,
+        vec![FamilyEvent::KidRenamed {
+            kid_id: elsa.id,
+            name: KidName::new("Elsa").expect("name"),
+        }]
+    );
+    let kid = f.family.kid(elsa.id).expect("kid");
+    assert_eq!(kid.name.as_str(), "Elsa");
+    assert_eq!(kid.wallet_id, elsa.wallet_id, "the Wallet stays the same");
+}
+
+#[test]
+fn a_hidden_kid_stays_active_and_can_be_shown_again() {
+    let mut f = Fixture::new();
+    let owner = f.owner();
+    let elsa = f.add_kid(owner, "Elsa").expect("added");
+    f.add_kid(owner, "Theo").expect("added");
+    let events = f.decide(owner, FamilyCommand::HideKid { kid_id: elsa.id });
+    assert_eq!(events, vec![FamilyEvent::KidHidden { kid_id: elsa.id }]);
+    assert!(f.family.kid(elsa.id).expect("kid").hidden);
+    assert_eq!(f.family.active_kids().count(), 2, "hidden is not archived");
+    assert_eq!(
+        f.decide(owner, FamilyCommand::HideKid { kid_id: elsa.id }),
+        vec![],
+        "hiding a hidden Kid changes nothing"
+    );
+
+    let events = f.decide(owner, FamilyCommand::ShowKid { kid_id: elsa.id });
+    assert_eq!(events, vec![FamilyEvent::KidShown { kid_id: elsa.id }]);
+    assert!(!f.family.kid(elsa.id).expect("kid").hidden);
+    assert_eq!(
+        f.decide(owner, FamilyCommand::ShowKid { kid_id: elsa.id }),
+        vec![]
+    );
+}
+
+#[test]
+fn a_viewer_cannot_rename_hide_or_show_kids() {
+    let mut f = Fixture::new();
+    let owner = f.owner();
+    let elsa = f.add_kid(owner, "Elsa").expect("added");
+    let viewer = f.join(&person(3, "viewer@example.com"), Role::Viewer);
+    for command in [
+        FamilyCommand::RenameKid {
+            kid_id: elsa.id,
+            name: KidName::new("Sneaky").expect("name"),
+        },
+        FamilyCommand::HideKid { kid_id: elsa.id },
+        FamilyCommand::ShowKid { kid_id: elsa.id },
+    ] {
+        assert_eq!(f.try_decide(viewer, command), Err(FamilyError::NotAllowed));
+    }
+    let parent = f.join(&person(2, "parent@example.com"), Role::Parent);
+    f.decide(parent, FamilyCommand::HideKid { kid_id: elsa.id });
+}
+
+#[test]
+fn an_archived_or_unknown_kid_cannot_be_renamed_hidden_or_shown() {
+    let mut f = Fixture::new();
+    let owner = f.owner();
+    let elsa = f.add_kid(owner, "Elsa").expect("added");
+    f.decide(owner, FamilyCommand::ArchiveKid { kid_id: elsa.id });
+    let stranger = KidId::from_uuid(Uuid::from_u128(1));
+    for (kid_id, error) in [
+        (elsa.id, FamilyError::KidArchived),
+        (stranger, FamilyError::UnknownKid),
+    ] {
+        for command in [
+            FamilyCommand::RenameKid {
+                kid_id,
+                name: KidName::new("Elsa").expect("name"),
+            },
+            FamilyCommand::HideKid { kid_id },
+            FamilyCommand::ShowKid { kid_id },
+        ] {
+            assert_eq!(f.try_decide(owner, command), Err(error));
+        }
+    }
+}
+
 // ---------- rebuilding ----------
 
 #[test]
@@ -678,7 +771,15 @@ fn replaying_the_history_rebuilds_the_same_family() {
     let owner = f.owner();
     f.join(&person(2, "parent@example.com"), Role::Parent);
     f.invite("grandma@example.com", Role::Viewer, "g");
-    f.add_kid(owner, "Elsa").expect("added");
+    let elsa = f.add_kid(owner, "Ellsa").expect("added");
+    f.decide(
+        owner,
+        FamilyCommand::RenameKid {
+            kid_id: elsa.id,
+            name: KidName::new("Elsa").expect("name"),
+        },
+    );
+    f.decide(owner, FamilyCommand::HideKid { kid_id: elsa.id });
     assert_eq!(Family::replay(&f.history), Ok(f.family.clone()));
 }
 

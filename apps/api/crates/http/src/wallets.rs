@@ -132,6 +132,16 @@ pub struct NewAccount {
     savings_goal: Option<SavingsGoalIn>,
 }
 
+/// Body of `POST …/accounts/{account_id}/close`.
+#[derive(Debug, Deserialize)]
+pub struct AccountClosing {
+    /// Where what is left goes; left out: the Main account.
+    move_to: Option<Uuid>,
+    /// The Memo of the Transfer that moves what is left.
+    memo: String,
+    occurred_on: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct KidRef {
     id: Uuid,
@@ -153,6 +163,13 @@ pub struct AccountDto {
     main: bool,
     balance: MoneyDto,
     savings_goal: Option<SavingsGoalDto>,
+}
+
+/// A closed Account, kept so its Transactions can still name it.
+#[derive(Debug, Serialize)]
+pub struct ClosedAccountDto {
+    id: Uuid,
+    name: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -179,6 +196,8 @@ pub struct WalletView {
     total: MoneyDto,
     /// Open Accounts, Main first.
     accounts: Vec<AccountDto>,
+    /// Closed Accounts, in opening order.
+    closed_accounts: Vec<ClosedAccountDto>,
     /// Every Transaction on every Account, newest first.
     transactions: Vec<TransactionDto>,
 }
@@ -281,6 +300,23 @@ pub async fn open_account(
     let command = WalletCommand::OpenAccount {
         name: AccountName::new(&body.name)?,
         savings_goal,
+    };
+    change(&state, &signed_in, family_id, wallet_id, &command).await
+}
+
+/// `POST …/accounts/{account_id}/close`: moves what is left to the Main account (or
+/// `move_to`) with a Transfer, then closes the Account. Its history stays (ADR-0013).
+pub async fn close_account(
+    State(state): State<AppState>,
+    signed_in: crate::auth::SignedIn,
+    Path((family_id, wallet_id, account_id)): Path<(Uuid, Uuid, Uuid)>,
+    Json(body): Json<AccountClosing>,
+) -> Result<(StatusCode, Json<WalletView>), ApiError> {
+    let command = WalletCommand::CloseAccount {
+        account_id: AccountId::from_uuid(account_id),
+        move_to: body.move_to.map(AccountId::from_uuid),
+        memo: Memo::new(&body.memo)?,
+        occurred_on: occurred_on(body.occurred_on.as_deref())?,
     };
     change(&state, &signed_in, family_id, wallet_id, &command).await
 }
@@ -426,6 +462,14 @@ fn view_of(family: &Family, wallet: &Wallet) -> Result<WalletView, ApiError> {
             }),
         })
         .collect();
+    let closed_accounts = wallet
+        .accounts()
+        .filter(|a| a.is_closed())
+        .map(|a| ClosedAccountDto {
+            id: a.id().as_uuid(),
+            name: a.name().as_str().to_owned(),
+        })
+        .collect();
     let mut rows: Vec<&Transaction> = wallet.accounts().flat_map(|a| a.ledger()).collect();
     // Newest first; the two sides of a Transfer stay together.
     rows.sort_by(|a, b| {
@@ -440,6 +484,7 @@ fn view_of(family: &Family, wallet: &Wallet) -> Result<WalletView, ApiError> {
         currency: wallet.currency().code().to_owned(),
         total: balance(wallet.total()),
         accounts,
+        closed_accounts,
         transactions: rows.into_iter().map(transaction).collect(),
     })
 }
