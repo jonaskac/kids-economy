@@ -54,6 +54,11 @@ logins per Family with Roles, and several Accounts per Kid inside one Wallet.
 : The secret link that carries an Invitation. Shown to the Owner once, who shares it any way
   they like (SMS, WhatsApp, in person); only a hash of its secret is stored.
 
+**Password reset link**
+: A secret link an Owner makes for a Member of their Family who forgot their password
+  (ADR-0012). Whoever opens it chooses a new password; that signs the User out on every
+  other device. Works once, for 24 hours; only a hash of its secret is stored.
+
 **Kid**
 : A child in a Family who owns exactly one Wallet. Archived, never deleted. In v1 a Kid
   cannot sign in. *Avoid:* child (in code), user, member.

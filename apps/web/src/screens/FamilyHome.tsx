@@ -1,10 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Avatar, BalanceStat, Button, KID_COLOURS, Sheet, TextField } from "@kids-economy/design-system";
-import { api, type FamilyView, type Me } from "../api";
-import { navigate, walletPath } from "../router";
+import { Avatar, BalanceStat, Button, KID_COLOURS, SelectField, Sheet, TextField } from "@kids-economy/design-system";
+import { api, ApiFailure, type FamilyView, type Me } from "../api";
+import { membersPath, navigate, walletPath } from "../router";
+import { AppLink, ErrorText } from "./parts";
 import { Screen } from "./Screen";
 
-export function FamilyHome({ me, onSignOut }: { me: Me; onSignOut: () => Promise<void> }) {
+export interface FamilyHomeProps {
+  me: Me;
+  onSignOut: () => Promise<void>;
+  /** A new Family was started: load who is signed in again. */
+  onFamilyStarted: () => Promise<void>;
+}
+
+export function FamilyHome({ me, onSignOut, onFamilyStarted }: FamilyHomeProps) {
   const familyId = me.families[0]?.id;
   const [family, setFamily] = useState<FamilyView | null>(null);
   const [adding, setAdding] = useState(false);
@@ -14,12 +22,7 @@ export function FamilyHome({ me, onSignOut }: { me: Me; onSignOut: () => Promise
   }, [familyId]);
 
   if (!familyId) {
-    return (
-      <Screen>
-        <h1 className="m-0 font-display text-[28px] font-semibold">Hi {me.user.name}</h1>
-        <p className="m-0 text-muted">You are not in a Family yet. Ask an Owner to send you an invitation link.</p>
-      </Screen>
-    );
+    return <StartFamily me={me} onSignOut={onSignOut} onStarted={onFamilyStarted} />;
   }
   if (!family) return <p className="p-4 text-muted">Loading…</p>;
 
@@ -75,6 +78,9 @@ export function FamilyHome({ me, onSignOut }: { me: Me; onSignOut: () => Promise
           Add a kid
         </Button>
       )}
+      <AppLink to={membersPath(family.id)} className="justify-center">
+        Family members
+      </AppLink>
       <AddKidSheet
         open={adding}
         familyId={family.id}
@@ -84,6 +90,63 @@ export function FamilyHome({ me, onSignOut }: { me: Me; onSignOut: () => Promise
           setAdding(false);
         }}
       />
+    </Screen>
+  );
+}
+
+const CURRENCIES = ["SEK", "NOK", "DKK", "EUR", "GBP", "USD"] as const;
+
+function StartFamily({ me, onSignOut, onStarted }: { me: Me; onSignOut: () => Promise<void>; onStarted: () => Promise<void> }) {
+  const [name, setName] = useState("");
+  const [currency, setCurrency] = useState<string>("SEK");
+  const [error, setError] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(undefined);
+    try {
+      await api.createFamily(name.trim(), currency);
+      await onStarted();
+    } catch (failure) {
+      setError(
+        failure instanceof ApiFailure && failure.code === "invalid_text"
+          ? "Give the Family a name."
+          : "Could not start the Family right now. Try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Screen>
+      <header className="flex items-center justify-between gap-3 pt-2">
+        <span className="text-[15px] leading-5 font-bold text-muted">Hi {me.user.name}</span>
+        <Button variant="quiet" onClick={() => void onSignOut()}>
+          Sign out
+        </Button>
+      </header>
+      <div className="flex flex-col gap-2">
+        <h1 className="m-0 font-display text-[28px] leading-[34px] font-semibold">Start a Family</h1>
+        <p className="m-0 text-muted">
+          You become its Owner and can add your kids. Invited by someone else? Open the Invitation link they sent
+          you instead.
+        </p>
+      </div>
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <TextField label="Family name" value={name} onChange={setName} placeholder="The Kacs" maxLength={60} />
+        <SelectField
+          label="Currency"
+          hint="Every Kid's money is in this Currency."
+          value={currency}
+          onChange={setCurrency}
+          options={CURRENCIES.map((code) => ({ value: code, label: code }))}
+        />
+        {error && <ErrorText>{error}</ErrorText>}
+        <Button type="submit" size="lg" disabled={name.trim() === "" || busy}>
+          Start {name.trim() || "a Family"}
+        </Button>
+      </form>
     </Screen>
   );
 }

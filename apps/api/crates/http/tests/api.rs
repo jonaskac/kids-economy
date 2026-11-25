@@ -841,3 +841,342 @@ async fn a_wallet_is_invisible_outside_its_family(pool: PgPool) {
     assert_eq!(unknown.status, StatusCode::NOT_FOUND);
     assert_eq!(unknown.json["error"], "wallet_not_found");
 }
+
+// ---------- Corrections ----------
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn a_parent_corrects_a_mistaken_deposit_and_both_stay_in_the_history(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+    let deposited = app
+        .post(
+            &format!("{wallet}/deposits"),
+            &owner,
+            json!({ "amount": sek(20000), "category": "allowance", "memo": "Pocket money" }),
+        )
+        .await;
+    let original = deposited.json["transactions"][0]["id"].clone();
+
+    let corrected = app
+        .post(
+            &format!("{wallet}/corrections"),
+            &owner,
+            json!({ "transaction_id": original, "reason": "Typed 200 instead of 20" }),
+        )
+        .await;
+    assert_eq!(corrected.status, StatusCode::CREATED, "{}", corrected.json);
+    assert_eq!(corrected.json["total"], sek(0));
+    let rows = corrected.json["transactions"].as_array().expect("rows");
+    assert_eq!(rows.len(), 2);
+    let correction = rows
+        .iter()
+        .find(|r| r["category"] == "correction")
+        .expect("a Correction");
+    assert_eq!(correction["direction"], "out");
+    assert_eq!(correction["amount"], sek(20000));
+    assert_eq!(correction["memo"], "Typed 200 instead of 20");
+    assert_eq!(correction["corrects"], original);
+
+    let again = app
+        .post(
+            &format!("{wallet}/corrections"),
+            &owner,
+            json!({ "transaction_id": original, "reason": "Again" }),
+        )
+        .await;
+    assert_eq!(again.status, StatusCode::CONFLICT);
+    assert_eq!(again.json["error"], "already_corrected");
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn correcting_a_transfer_corrects_both_sides(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+    let opened = app
+        .post(
+            &format!("{wallet}/accounts"),
+            &owner,
+            json!({ "name": "Savings" }),
+        )
+        .await;
+    let main_id = account_named(&opened.json, "Main")["id"].clone();
+    let savings_id = account_named(&opened.json, "Savings")["id"].clone();
+    app.post(
+        &format!("{wallet}/deposits"),
+        &owner,
+        json!({ "amount": sek(3000), "category": "gift", "memo": "From mormor" }),
+    )
+    .await;
+    let moved = app
+        .post(
+            &format!("{wallet}/transfers"),
+            &owner,
+            json!({ "from": main_id, "to": savings_id, "amount": sek(1000), "memo": "Oops" }),
+        )
+        .await;
+    let leg = moved.json["transactions"][0]["id"].clone();
+
+    let corrected = app
+        .post(
+            &format!("{wallet}/corrections"),
+            &owner,
+            json!({ "transaction_id": leg, "reason": "Wrong account" }),
+        )
+        .await;
+    assert_eq!(corrected.status, StatusCode::CREATED, "{}", corrected.json);
+    assert_eq!(account_named(&corrected.json, "Main")["balance"], sek(3000));
+    assert_eq!(account_named(&corrected.json, "Savings")["balance"], sek(0));
+    let corrections: Vec<_> = corrected.json["transactions"]
+        .as_array()
+        .expect("rows")
+        .iter()
+        .filter(|r| r["category"] == "correction")
+        .collect();
+    assert_eq!(corrections.len(), 2);
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn a_correction_needs_a_known_transaction_a_reason_and_a_parent(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+    let deposited = app
+        .post(
+            &format!("{wallet}/deposits"),
+            &owner,
+            json!({ "amount": sek(500), "category": "chore", "memo": "Dishes" }),
+        )
+        .await;
+    let original = deposited.json["transactions"][0]["id"].clone();
+    let viewer = app
+        .join(&owner, &family, "mormor@example.com", "viewer")
+        .await;
+
+    let unknown = app
+        .post(
+            &format!("{wallet}/corrections"),
+            &owner,
+            json!({ "transaction_id": "00000000-0000-0000-0000-000000000000", "reason": "Hm" }),
+        )
+        .await;
+    assert_eq!(unknown.status, StatusCode::NOT_FOUND);
+    assert_eq!(unknown.json["error"], "unknown_transaction");
+
+    let blank = app
+        .post(
+            &format!("{wallet}/corrections"),
+            &owner,
+            json!({ "transaction_id": original, "reason": "  " }),
+        )
+        .await;
+    assert_eq!(blank.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(blank.json["error"], "invalid_text");
+
+    let refused = app
+        .post(
+            &format!("{wallet}/corrections"),
+            &viewer,
+            json!({ "transaction_id": original, "reason": "Mine" }),
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert_eq!(refused.json["error"], "not_allowed");
+}
+
+// ---------- Password reset links ----------
+
+/// The Family's Member id for `email`.
+async fn member_id(app: &App, cookie: &str, family: &str, email: &str) -> String {
+    let view = app.get(&format!("/api/families/{family}"), cookie).await;
+    view.json["members"]
+        .as_array()
+        .expect("members")
+        .iter()
+        .find(|m| m["email"] == email)
+        .and_then(|m| m["id"].as_str())
+        .expect("the Member")
+        .to_owned()
+}
+
+/// Makes a Password reset link as `owner` and returns its secret.
+async fn reset_link(app: &App, owner: &str, family: &str, member: &str) -> String {
+    let reply = app
+        .post(
+            &format!("/api/families/{family}/members/{member}/password-reset"),
+            owner,
+            json!({}),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::CREATED, "{}", reply.json);
+    assert!(reply.json["expires_at"].is_string());
+    reply.json["link"]
+        .as_str()
+        .and_then(|link| link.strip_prefix("/reset/"))
+        .expect("a /reset/ link")
+        .to_owned()
+}
+
+async fn sign_in(app: &App, email: &str, password: &str) -> Reply {
+    app.send(
+        Method::POST,
+        "/api/sessions",
+        None,
+        Some(json!({ "email": email, "password": password })),
+    )
+    .await
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn an_owner_makes_a_reset_link_and_the_member_chooses_a_new_password(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let old_session = app
+        .join(&owner, &family, "mormor@example.com", "viewer")
+        .await;
+    let mormor = member_id(&app, &owner, &family, "mormor@example.com").await;
+    let secret = reset_link(&app, &owner, &family, &mormor).await;
+
+    let preview = app
+        .send(
+            Method::GET,
+            &format!("/api/password-resets/{secret}"),
+            None,
+            None,
+        )
+        .await;
+    assert_eq!(preview.status, StatusCode::OK, "{}", preview.json);
+    assert_eq!(preview.json["email"], "mormor@example.com");
+    assert_eq!(preview.json["state"], "pending");
+
+    let short = app
+        .send(
+            Method::POST,
+            &format!("/api/password-resets/{secret}"),
+            None,
+            Some(json!({ "password": "short" })),
+        )
+        .await;
+    assert_eq!(short.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(short.json["error"], "password_too_short");
+
+    let reset = app
+        .send(
+            Method::POST,
+            &format!("/api/password-resets/{secret}"),
+            None,
+            Some(json!({ "password": "a brand new password" })),
+        )
+        .await;
+    assert_eq!(reset.status, StatusCode::OK, "{}", reset.json);
+    assert_eq!(reset.json["user"]["email"], "mormor@example.com");
+    let new_session = reset.session();
+    assert_eq!(
+        app.get("/api/me", &new_session).await.status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        app.get("/api/me", &old_session).await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        sign_in(&app, "mormor@example.com", "correct horse battery")
+            .await
+            .status,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        sign_in(&app, "mormor@example.com", "a brand new password")
+            .await
+            .status,
+        StatusCode::OK
+    );
+
+    let used = app
+        .send(
+            Method::POST,
+            &format!("/api/password-resets/{secret}"),
+            None,
+            Some(json!({ "password": "yet another password" })),
+        )
+        .await;
+    assert_eq!(used.status, StatusCode::CONFLICT);
+    assert_eq!(used.json["error"], "password_reset_used");
+    let preview = app
+        .send(
+            Method::GET,
+            &format!("/api/password-resets/{secret}"),
+            None,
+            None,
+        )
+        .await;
+    assert_eq!(preview.json["state"], "used");
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn only_an_owner_makes_reset_links_and_only_for_members(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let parent = app
+        .join(&owner, &family, "parent@example.com", "parent")
+        .await;
+    let mormor_cookie = app
+        .join(&owner, &family, "mormor@example.com", "viewer")
+        .await;
+    let mormor = member_id(&app, &owner, &family, "mormor@example.com").await;
+
+    let refused = app
+        .post(
+            &format!("/api/families/{family}/members/{mormor}/password-reset"),
+            &parent,
+            json!({}),
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert_eq!(refused.json["error"], "not_allowed");
+
+    let unknown = app
+        .post(
+            &format!(
+                "/api/families/{family}/members/00000000-0000-0000-0000-000000000000/password-reset"
+            ),
+            &owner,
+            json!({}),
+        )
+        .await;
+    assert_eq!(unknown.status, StatusCode::NOT_FOUND);
+    assert_eq!(unknown.json["error"], "unknown_member");
+
+    let stranger = app.sign_up("stranger@example.com", "Stranger").await;
+    let hidden = app
+        .post(
+            &format!("/api/families/{family}/members/{mormor}/password-reset"),
+            &stranger,
+            json!({}),
+        )
+        .await;
+    assert_eq!(hidden.status, StatusCode::NOT_FOUND);
+    assert_eq!(hidden.json["error"], "family_not_found");
+    drop(mormor_cookie);
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn an_unknown_reset_link_is_not_found(pool: PgPool) {
+    let app = App::new(pool);
+    let preview = app
+        .send(Method::GET, "/api/password-resets/nope", None, None)
+        .await;
+    assert_eq!(preview.status, StatusCode::NOT_FOUND);
+    assert_eq!(preview.json["error"], "unknown_password_reset");
+    let reset = app
+        .send(
+            Method::POST,
+            "/api/password-resets/nope",
+            None,
+            Some(json!({ "password": "a brand new password" })),
+        )
+        .await;
+    assert_eq!(reset.status, StatusCode::NOT_FOUND);
+    assert_eq!(reset.json["error"], "unknown_password_reset");
+}

@@ -1,5 +1,5 @@
 //! A Kid's Wallet: its Accounts, Balances and Transactions, and the Deposits,
-//! Withdrawals and Transfers Members record on it (ADR-0008, ADR-0009).
+//! Withdrawals, Transfers and Corrections Members record on it (ADR-0008, ADR-0009).
 //!
 //! Every route sits under `/api/families/{family_id}/wallets/{wallet_id}`, so the Family's
 //! tenant boundary (404 to non-Members) applies first. Each change answers with the whole
@@ -12,7 +12,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use domain::family::Family;
-use domain::ids::{AccountId, WalletId};
+use domain::ids::{AccountId, TransactionId, WalletId};
 use domain::money::{Amount, Balance, Currency};
 use domain::role::Context;
 use domain::text::{AccountName, Memo};
@@ -108,6 +108,14 @@ pub struct NewTransfer {
     to: Uuid,
     amount: AmountIn,
     memo: String,
+    occurred_on: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NewCorrection {
+    transaction_id: Uuid,
+    /// Shown to the Kid as the Correction's Memo.
+    reason: String,
     occurred_on: Option<String>,
 }
 
@@ -234,6 +242,22 @@ pub async fn transfer(
         to: AccountId::from_uuid(body.to),
         amount: body.amount.to_amount()?,
         memo: Memo::new(&body.memo)?,
+        occurred_on: occurred_on(body.occurred_on.as_deref())?,
+    };
+    change(&state, &signed_in, family_id, wallet_id, &command).await
+}
+
+/// `POST …/corrections`: reverses a mistaken Transaction with a new one. Nothing is
+/// edited or deleted; correcting one side of a Transfer corrects both.
+pub async fn correct(
+    State(state): State<AppState>,
+    signed_in: crate::auth::SignedIn,
+    Path((family_id, wallet_id)): Path<(Uuid, Uuid)>,
+    Json(body): Json<NewCorrection>,
+) -> Result<(StatusCode, Json<WalletView>), ApiError> {
+    let command = WalletCommand::Correct {
+        transaction_id: TransactionId::from_uuid(body.transaction_id),
+        reason: Memo::new(&body.reason)?,
         occurred_on: occurred_on(body.occurred_on.as_deref())?,
     };
     change(&state, &signed_in, family_id, wallet_id, &command).await

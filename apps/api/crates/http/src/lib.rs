@@ -1,13 +1,14 @@
 //! HTTP layer: axum routes, DTOs and auth. Everything is mounted under `/api`.
 //!
 //! Sign-in uses email + password and a Session cookie; Invitations travel as links
-//! (ADR-0011). Every Family route answers 404 to anyone who is not an active Member,
+//! (ADR-0011), and so do Password reset links (ADR-0012). Every Family route answers 404 to anyone who is not an active Member,
 //! so Families stay invisible to each other (glossary: Family).
 
 mod auth;
 mod error;
 mod families;
 mod invitations;
+mod password_resets;
 mod users;
 mod wallets;
 
@@ -19,7 +20,7 @@ use axum::{Json, Router};
 use domain::ids::NewIds;
 use serde::Serialize;
 use sqlx::PgPool;
-use store::{FamilyStore, SessionStore, UserStore, WalletStore};
+use store::{FamilyStore, PasswordResetStore, SessionStore, UserStore, WalletStore};
 use uuid::Uuid;
 
 /// What every handler needs: the stores and the password hasher.
@@ -27,6 +28,7 @@ use uuid::Uuid;
 pub struct AppState {
     pub(crate) users: UserStore,
     pub(crate) sessions: SessionStore,
+    pub(crate) password_resets: PasswordResetStore,
     pub(crate) families: FamilyStore,
     pub(crate) wallets: WalletStore,
     pub(crate) passwords: Passwords,
@@ -37,6 +39,7 @@ impl AppState {
         Self {
             users: UserStore::new(pool.clone()),
             sessions: SessionStore::new(pool.clone()),
+            password_resets: PasswordResetStore::new(pool.clone()),
             families: FamilyStore::new(pool.clone()),
             wallets: WalletStore::new(pool),
             passwords,
@@ -72,6 +75,10 @@ pub fn router(state: AppState) -> Router {
             "/api/families/{family_id}/members/{member_id}",
             patch(families::change_role).delete(families::remove_member),
         )
+        .route(
+            "/api/families/{family_id}/members/{member_id}/password-reset",
+            post(password_resets::create),
+        )
         .route("/api/families/{family_id}/kids", post(families::add_kid))
         .route(
             "/api/families/{family_id}/kids/{kid_id}/archive",
@@ -94,6 +101,10 @@ pub fn router(state: AppState) -> Router {
             post(wallets::transfer),
         )
         .route(
+            "/api/families/{family_id}/wallets/{wallet_id}/corrections",
+            post(wallets::correct),
+        )
+        .route(
             "/api/families/{family_id}/wallets/{wallet_id}/accounts",
             post(wallets::open_account),
         )
@@ -101,6 +112,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/invitations/{secret}/accept",
             post(invitations::accept),
+        )
+        .route(
+            "/api/password-resets/{secret}",
+            get(password_resets::preview).post(password_resets::reset),
         )
         .with_state(state)
 }

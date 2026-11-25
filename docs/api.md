@@ -2,7 +2,7 @@
 
 All routes live under `/api`, take and return JSON, and use the words in
 [`glossary.md`](glossary.md). Roadmap step 6 completes this spec; step 5 adds sign-in,
-Families, Invitations and Kids (ADR-0010, ADR-0011).
+Families, Invitations and Kids (ADR-0010, ADR-0011); Password reset links follow ADR-0012.
 
 ## Conventions
 
@@ -38,6 +38,7 @@ Families, Invitations and Kids (ADR-0010, ADR-0011).
 | 🔒 `DELETE /api/families/{id}/invitations/{invitation_id}` | | `204` | `403`, `404 unknown_invitation`, `409 invitation_not_pending` |
 | 🔒 `PATCH /api/families/{id}/members/{member_id}` | `{role}` | `204` | `403`, `404 unknown_member`, `409 last_owner` |
 | 🔒 `DELETE /api/families/{id}/members/{member_id}` | | `204` (yourself: leave) | `403`, `404 unknown_member`, `409 last_owner` |
+| 🔒 `POST /api/families/{id}/members/{member_id}/password-reset` | `{}` | `201 {link, expires_at}`; see Password reset links | `403` (not Owner), `404 unknown_member` |
 | 🔒 `POST /api/families/{id}/kids` | `{name}` | `201 {id, name, wallet_id}`; the Wallet opens with a Main account | `403` (Viewer), `422 invalid_text` |
 | 🔒 `POST /api/families/{id}/kids/{kid_id}/archive` | `{}` | `204` | `403`, `404 unknown_kid`, `409 kid_archived` |
 
@@ -67,6 +68,7 @@ read; changes by a Viewer answer `403 not_allowed`. Dates are `YYYY-MM-DD` and d
 | 🔒 `POST …/deposits` | `{account_id?, amount, category, memo, occurred_on?}`; `category` is `allowance`, `chore`, `gift` or `interest`; no `account_id` means the Main account | `422 invalid_amount`, `currency_mismatch`, `invalid_text`, `invalid_date`; `404 unknown_account` |
 | 🔒 `POST …/withdrawals` | `{account_id, amount, category, memo, occurred_on?}`; `category` is `purchase` or `donation` | as above, plus `422 insufficient_funds` (no Overdraft) |
 | 🔒 `POST …/transfers` | `{from, to, amount, memo, occurred_on?}` | as above, plus `422 same_account` |
+| 🔒 `POST …/corrections` | `{transaction_id, reason, occurred_on?}`; `reason` becomes the Correction's Memo; correcting one side of a Transfer corrects both | `404 unknown_transaction`; `409 already_corrected`; `422 invalid_text`, `insufficient_funds` (the reversal would overdraw) |
 | 🔒 `POST …/accounts` | `{name, savings_goal?: {name, target, target_date?}}` | `422 invalid_text`, `currency_mismatch` |
 
 ```json
@@ -92,6 +94,17 @@ page calls:
 | --- | --- | --- |
 | `GET /api/invitations/{secret}` (no sign-in needed) | `200 {family_name, email, role, state, expires_at}`; `state` is `pending`, `accepted`, `revoked` or `expired` | `404 unknown_invitation` |
 | 🔒 `POST /api/invitations/{secret}/accept` | `200 {family_id, member_id, role}` | `403 wrong_email`, `409 already_member`, `invitation_not_pending`, `410 invitation_expired` |
+
+## Password reset links
+
+An Owner makes one for a Member (ADR-0012). The `link` is `/reset/<secret>`, shown once,
+working once for 24 hours; a new link for the same User replaces an unused one. The web
+app's `/reset/<secret>` page calls:
+
+| Method and path | Body | Success | Errors |
+| --- | --- | --- | --- |
+| `GET /api/password-resets/{secret}` | | `200 {email, name, state, expires_at}`; `state` is `pending`, `used` or `expired` | `404 unknown_password_reset` |
+| `POST /api/password-resets/{secret}` | `{password}` | `200 {user}` + cookie; every other Session of that User ends | `404 unknown_password_reset`, `409 password_reset_used`, `410 password_reset_expired`, `422 password_too_short`, `password_too_long` |
 
 Try it locally (nushell):
 

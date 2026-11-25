@@ -14,6 +14,9 @@ pub enum StoreError {
     /// Another User already signs in with this email address.
     #[error("the email address is already registered")]
     EmailTaken,
+    /// The Password reset link is unknown, already used or expired.
+    #[error("the password reset link is unknown, used or expired")]
+    PasswordResetNotPending,
     /// A Wallet opened together with a Kid must belong to that Kid's Family.
     #[error("the Wallet belongs to another Family")]
     WrongFamily,

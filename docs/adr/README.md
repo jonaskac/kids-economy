@@ -16,3 +16,4 @@ New ADR: copy [`template.md`](template.md), take the next number, add it below.
 | 0009 | [Wallet History in Postgres, numbered per Wallet](0009-wallet-history-in-postgres.md) | proposed |
 | 0010 | [Families and Users as documents, decided like the Wallet](0010-families-and-users-as-documents.md) | proposed |
 | 0011 | [Sign in with email and password; Invitations as links](0011-password-sign-in-and-invitation-links.md) | accepted |
+| 0012 | [Password reset links, made by an Owner for a Member](0012-password-reset-links-made-by-owners.md) | accepted |
