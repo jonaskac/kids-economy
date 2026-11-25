@@ -17,9 +17,9 @@ Each step is done TDD-first and ends in a pushed, reviewable commit.
 | 3  | Ledger domain, pure Rust, TDD: Amount, Wallet, Accounts, Deposit, Withdrawal, Transfer, Balance, no-Overdraft rule | `crates/domain` | done |
 | 4  | Persistence: `ledger_events` numbered per Wallet (ADR-0009), Wallet store, concurrency tests; `documents` moves to step 5 | `crates/store`                         | done |
 | 5  | Identity & Family (+ `documents` table): sign-up/sign-in, sessions, create Family, Members with Roles, Invitations, add Kid (ADR-0010, ADR-0011) | domain + store + http, `docs/api.md` | in review |
-| 6  | HTTP API: endpoints + contract tests, API spec                                          | `crates/http`, `docs/api.md`             |        |
-| 7  | Design system v0: tokens, Tailwind preset, primitives (Button, Card, AmountText, TransactionRow, Avatar, Sheet) | `packages/design-system` |        |
-| 8  | Parent app: sign-in, Family overview, Account view, Deposit/Withdrawal sheet           | `apps/web`                               |        |
+| 6  | HTTP API: endpoints + contract tests, API spec                                          | `crates/http`, `docs/api.md`             | Wallet routes in review |
+| 7  | Design system v0: tokens, Tailwind preset, primitives (Button, Card, AmountText, TransactionRow, Avatar, Sheet) | `packages/design-system` | v1 draft in review |
+| 8  | Parent app: sign-in, Family overview, Account view, Deposit/Withdrawal sheet           | `apps/web`                               | first slice in review |
 | 9  | Packaging & deploy: Dockerfile, Sliplane service + Postgres, migrations on boot         | `Dockerfile`, `docs/deploy.md`           |        |
 | 10 | Hardening: E2E (Playwright), backups, logging, error pages                              |                                          |        |
 

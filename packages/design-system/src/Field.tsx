@@ -6,8 +6,8 @@ const CONTROL =
 
 interface Common {
   label: string;
-  hint?: string;
-  error?: string;
+  hint?: string | undefined;
+  error?: string | undefined;
 }
 
 function Messages({ id, hint, error }: { id: string; hint?: string | undefined; error?: string | undefined }) {

@@ -33,7 +33,7 @@ export function Sheet({ open, title, description, onClose, children, actions }: 
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="flex max-h-[92dvh] w-full max-w-[480px] flex-col gap-4 overflow-y-auto rounded-t-card bg-surface-raised px-4 pt-6 pb-[calc(16px+env(safe-area-inset-bottom,0px))] text-ink shadow-dialog sm:rounded-card sm:p-6"
+        className="flex max-h-[92dvh] w-full *:shrink-0 max-w-[480px] flex-col gap-4 overflow-y-auto rounded-t-card bg-surface-raised px-4 pt-6 pb-[calc(16px+env(safe-area-inset-bottom,0px))] text-ink shadow-dialog sm:rounded-card sm:p-6"
       >
         <h2 id={titleId} className="m-0 font-display text-[22px] leading-7 font-semibold">
           {title}

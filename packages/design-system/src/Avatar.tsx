@@ -18,7 +18,7 @@ const SIZE = {
 
 export interface AvatarProps {
   name: string;
-  colour?: KidColour;
+  colour?: KidColour | undefined;
   size?: keyof typeof SIZE;
 }
 

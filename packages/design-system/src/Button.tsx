@@ -17,11 +17,11 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * Defaults to `type="button"`; pass `type="submit"` explicitly inside forms.
  */
 export function Button({ type = "button", variant = "primary", size = "md", className = "", ...props }: ButtonProps) {
-  const height = size === "lg" ? "min-h-14 text-[19px] px-6" : "min-h-12 text-[17px] px-5";
+  const height = `${size === "lg" ? "min-h-14 text-[19px] px-6" : "min-h-12 text-[17px] px-5"}`;
   return (
     <button
       type={type}
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-control border-2 font-extrabold whitespace-nowrap transition-transform active:translate-y-px disabled:opacity-45 ${height} ${VARIANTS[variant]} ${className}`.trim()}
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-control border-2 font-extrabold transition-transform active:translate-y-px disabled:opacity-45 ${height} ${VARIANTS[variant]} ${className}`.trim()}
       {...props}
     />
   );
