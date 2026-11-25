@@ -2,38 +2,97 @@
  * Kids Economy theme for Tailwind CSS v4. Import once in an app:
  *   @import "tailwindcss";
  *   @import "@kids-economy/design-system/theme.css";
- * Values mirror src/tokens.ts (v0 placeholders).
+ * Values mirror src/tokens.ts (v1 draft). Fonts: Fredoka and Nunito from Google Fonts,
+ * linked in the app's index.html.
  */
 @theme {
-  --color-surface: #ffffff;
-  --color-ink: #1d1f24;
-  --color-muted: #5b5f6a;
-  --color-line: #e4e5e9;
-  --color-brand: #2f6fde;
+  --color-surface: #f7f5f0;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #eeebe3;
+  --color-line: #ddd8cc;
+  --color-line-strong: #8c867a;
+  --color-ink: #1c2826;
+  --color-muted: #596663;
+  --color-brand: #0d7064;
+  --color-brand-soft: #d8efe9;
   --color-on-brand: #ffffff;
-  --color-money-in: #1d7a3a;
-  --color-money-out: #b3261e;
+  --color-coin: #f0b429;
+  --color-coin-strong: #a86c00;
+  --color-coin-soft: #fcefd0;
+  --color-coin-ink: #7d5300;
+  --color-money-in: #0b6a5f;
+  --color-money-out: #b04316;
+  --color-money-out-soft: #fbe6db;
+  --color-danger: #b3261e;
+  --color-danger-soft: #fbe3e0;
+  --color-focus: #2257d6;
+  --color-kid-sea: #bfe6df;
+  --color-kid-sun: #fbe0a0;
+  --color-kid-berry: #f6c9d6;
+  --color-kid-leaf: #cfe8b6;
+  --color-kid-sky: #c7dcf7;
+  --color-scrim: rgb(10 20 18 / 0.45);
 
-  --radius-control: 12px;
-  --radius-card: 20px;
+  --font-display: Fredoka, Nunito, ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  --font-sans: Nunito, ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+
+  --radius-field: 10px;
+  --radius-control: 16px;
+  --radius-card: 24px;
+
+  --shadow-card: 0 1px 2px rgb(28 40 38 / 0.06), 0 4px 16px rgb(28 40 38 / 0.06);
+  --shadow-dialog: 0 8px 40px rgb(28 40 38 / 0.18);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-surface: #15161a;
-    --color-ink: #f4f4f5;
-    --color-muted: #a9acb5;
-    --color-line: #2c2e35;
-    --color-brand: #7aa7ff;
-    --color-on-brand: #0d1b33;
-    --color-money-in: #6fd38f;
-    --color-money-out: #f2a39d;
+    --color-surface: #141c1b;
+    --color-surface-raised: #1d2826;
+    --color-surface-sunken: #0f1615;
+    --color-line: #34423f;
+    --color-line-strong: #7d8f8b;
+    --color-ink: #eef4f2;
+    --color-muted: #a7b6b2;
+    --color-brand: #5ad1bf;
+    --color-brand-soft: #173a34;
+    --color-on-brand: #0a1d1a;
+    --color-coin: #f4c44e;
+    --color-coin-strong: #f4c44e;
+    --color-coin-soft: #3a2f12;
+    --color-coin-ink: #f4c44e;
+    --color-money-in: #62d6c4;
+    --color-money-out: #ff9f76;
+    --color-money-out-soft: #3d2216;
+    --color-danger: #ff8b80;
+    --color-danger-soft: #3d1a17;
+    --color-focus: #8fb0ff;
+    --color-kid-sea: #1f4a44;
+    --color-kid-sun: #4a3b12;
+    --color-kid-berry: #4d2433;
+    --color-kid-leaf: #2c4220;
+    --color-kid-sky: #22385a;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-dialog: 0 8px 40px rgb(0 0 0 / 0.6);
   }
 }
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
   body {
+    margin: 0;
     background-color: var(--color-surface);
     color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 17px;
+    line-height: 24px;
+    font-weight: 500;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
   }
 }
