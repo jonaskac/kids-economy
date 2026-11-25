@@ -18,6 +18,7 @@ serde_json = "1"
 thiserror = "2"
 time = "0.3"
 uuid = "1"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "json", "uuid", "time"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
