@@ -21,6 +21,8 @@ export interface KidSummary {
   id: string;
   name: string;
   wallet_id: string;
+  /** Left off the Family home; still listed in Family settings (ADR-0013). */
+  hidden: boolean;
   wallet_total?: Amount;
 }
 
@@ -86,6 +88,8 @@ export interface WalletView {
   currency: string;
   total: Amount;
   accounts: Account[];
+  /** Closed Accounts, kept so their Transactions can still name them. */
+  closed_accounts: { id: string; name: string }[];
   transactions: Transaction[];
 }
 
@@ -164,6 +168,12 @@ export const api = {
     call<{ user: User }>("POST", `/api/password-resets/${encodeURIComponent(secret)}`, { password }),
   family: (familyId: string) => call<FamilyView>("GET", `/api/families/${familyId}`),
   addKid: (familyId: string, name: string) => call<KidSummary>("POST", `/api/families/${familyId}/kids`, { name }),
+  /** Fixes a Kid's name, or hides or shows them on the Family home. */
+  changeKid: (familyId: string, kidId: string, body: { name?: string; hidden?: boolean }) =>
+    call<undefined>("PATCH", `/api/families/${familyId}/kids/${kidId}`, body),
+  /** "Remove kid": archives them; their Wallet and History are kept. */
+  removeKid: (familyId: string, kidId: string) =>
+    call<undefined>("POST", `/api/families/${familyId}/kids/${kidId}/archive`, {}),
   wallet: (familyId: string, walletId: string) => call<WalletView>("GET", wallet(familyId, walletId)),
   deposit: (
     familyId: string,
@@ -182,6 +192,9 @@ export const api = {
   ) => call<WalletView>("POST", `${wallet(familyId, walletId)}/transfers`, body),
   openAccount: (familyId: string, walletId: string, body: NewAccount) =>
     call<WalletView>("POST", `${wallet(familyId, walletId)}/accounts`, body),
+  /** Moves what is left to `move_to` (default: the Main account), then closes the Account. */
+  closeAccount: (familyId: string, walletId: string, accountId: string, body: { move_to?: string; memo: string }) =>
+    call<WalletView>("POST", `${wallet(familyId, walletId)}/accounts/${accountId}/close`, body),
   correct: (familyId: string, walletId: string, body: { transaction_id: string; reason: string }) =>
     call<WalletView>("POST", `${wallet(familyId, walletId)}/corrections`, body),
 };

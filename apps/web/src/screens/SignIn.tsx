@@ -16,7 +16,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
         </Button>
         {forgot && (
           <p className="m-0 max-w-[36ch] rounded-control bg-surface-sunken px-4 py-3 text-[15px] leading-5 font-semibold text-muted">
-            Ask an Owner in your Family for a password reset link. They make it under Family members and send
+            Ask an Owner in your Family for a password reset link. They make it under Family settings and send
             it to you.
           </p>
         )}

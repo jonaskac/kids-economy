@@ -29,4 +29,11 @@ describe("Button", () => {
     render(<Button variant="secondary">Cancel</Button>);
     expect(screen.getByRole("button", { name: "Cancel" })).toHaveClass("border-line-strong");
   });
+
+  it("has a danger variant for actions that cannot be undone from the app", () => {
+    render(<Button variant="danger">Remove Elsa</Button>);
+    const button = screen.getByRole("button", { name: "Remove Elsa" });
+    expect(button).toHaveClass("text-danger");
+    expect(button).toHaveClass("border-danger");
+  });
 });

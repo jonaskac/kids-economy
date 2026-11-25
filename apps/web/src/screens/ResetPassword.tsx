@@ -6,7 +6,7 @@ import { Screen } from "./Screen";
 
 type Loaded = { state: "loading" } | { state: "unknown" } | { state: "found"; preview: PasswordResetPreview };
 
-const ASK_AGAIN = "Ask an Owner for a new one. They make it under Family members.";
+const ASK_AGAIN = "Ask an Owner for a new one. They make it under Family settings.";
 
 /** `/reset/<secret>`: the Member chooses a new password from a Password reset link. */
 export function ResetPassword({ secret, onSignedIn }: { secret: string; onSignedIn: () => Promise<void> }) {

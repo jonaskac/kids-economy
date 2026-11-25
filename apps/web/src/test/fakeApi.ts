@@ -21,6 +21,7 @@ export function elsaWallet(): WalletView {
         savings_goal: { name: "Lego set", target: sek(40000), target_date: null },
       },
     ],
+    closed_accounts: [],
     transactions: [
       {
         id: "tx-1",
@@ -47,8 +48,8 @@ export function family(role: "owner" | "viewer" = "owner"): FamilyView {
     members: [],
     invitations: [],
     kids: [
-      { id: "kid-elsa", name: "Elsa", wallet_id: ELSA_WALLET, wallet_total: sek(5000) },
-      { id: "kid-leo", name: "Leo", wallet_id: "wal-leo", wallet_total: sek(850) },
+      { id: "kid-elsa", name: "Elsa", wallet_id: ELSA_WALLET, hidden: false, wallet_total: sek(5000) },
+      { id: "kid-leo", name: "Leo", wallet_id: "wal-leo", hidden: false, wallet_total: sek(850) },
     ],
   };
 }

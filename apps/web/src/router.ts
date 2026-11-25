@@ -27,13 +27,14 @@ export function matchWallet(path: string): { familyId: string; walletId: string 
   return { familyId: match[1], walletId: match[2] };
 }
 
-/** `/families/{familyId}/members`: who is in the Family. */
-export function membersPath(familyId: string): string {
-  return `/families/${familyId}/members`;
+/** `/families/{familyId}/settings`: the Family's Kids and Members. */
+export function settingsPath(familyId: string): string {
+  return `/families/${familyId}/settings`;
 }
 
-export function matchMembers(path: string): { familyId: string } | null {
-  const match = /^\/families\/([^/]+)\/members\/?$/.exec(path);
+/** Family settings; `/members` was its earlier path and still works. */
+export function matchSettings(path: string): { familyId: string } | null {
+  const match = /^\/families\/([^/]+)\/(?:settings|members)\/?$/.exec(path);
   return match?.[1] ? { familyId: match[1] } : null;
 }
 
