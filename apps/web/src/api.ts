@@ -48,6 +48,12 @@ export interface Account {
   savings_goal: SavingsGoal | null;
 }
 
+/** Body of `POST …/accounts` (docs/api.md). */
+export interface NewAccount {
+  name: string;
+  savings_goal?: { name: string; target: Amount; target_date?: string };
+}
+
 export type Category =
   | "allowance"
   | "chore"
@@ -174,6 +180,8 @@ export const api = {
     walletId: string,
     body: { from: string; to: string; amount: Amount; memo: string },
   ) => call<WalletView>("POST", `${wallet(familyId, walletId)}/transfers`, body),
+  openAccount: (familyId: string, walletId: string, body: NewAccount) =>
+    call<WalletView>("POST", `${wallet(familyId, walletId)}/accounts`, body),
   correct: (familyId: string, walletId: string, body: { transaction_id: string; reason: string }) =>
     call<WalletView>("POST", `${wallet(familyId, walletId)}/corrections`, body),
 };

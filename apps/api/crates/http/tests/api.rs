@@ -1180,3 +1180,61 @@ async fn an_unknown_reset_link_is_not_found(pool: PgPool) {
     assert_eq!(reset.status, StatusCode::NOT_FOUND);
     assert_eq!(reset.json["error"], "unknown_password_reset");
 }
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn a_viewer_cannot_open_an_account(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+    let viewer = app
+        .join(&owner, &family, "viewer@example.com", "viewer")
+        .await;
+
+    let refused = app
+        .post(
+            &format!("{wallet}/accounts"),
+            &viewer,
+            json!({ "name": "Fun stuff" }),
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{}", refused.json);
+
+    let view = app.get(&wallet, &owner).await;
+    assert_eq!(view.json["accounts"].as_array().map(Vec::len), Some(1));
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn account_and_goal_names_stay_within_40_letters(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+
+    let fits = app
+        .post(
+            &format!("{wallet}/accounts"),
+            &owner,
+            json!({ "name": "å".repeat(40) }),
+        )
+        .await;
+    assert_eq!(fits.status, StatusCode::CREATED, "{}", fits.json);
+
+    let long_name = app
+        .post(
+            &format!("{wallet}/accounts"),
+            &owner,
+            json!({ "name": "å".repeat(41) }),
+        )
+        .await;
+    assert_eq!(long_name.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(long_name.json["error"], "invalid_text");
+
+    let long_goal = app
+        .post(
+            &format!("{wallet}/accounts"),
+            &owner,
+            json!({ "name": "Bike", "savings_goal": { "name": "å".repeat(41), "target": sek(150000) } }),
+        )
+        .await;
+    assert_eq!(long_goal.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(long_goal.json["error"], "invalid_text");
+}

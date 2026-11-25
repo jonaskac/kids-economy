@@ -13,10 +13,11 @@ import { navigate } from "../router";
 import { CATEGORY_LABEL, shortDay, transactionWord } from "../words";
 import { CorrectionSheet } from "./CorrectionSheet";
 import { MoneySheet } from "./MoneySheet";
+import { NewAccountSheet } from "./NewAccountSheet";
 import { Screen } from "./Screen";
 import { TransferSheet } from "./TransferSheet";
 
-type Open = "none" | "deposit" | "withdrawal" | "transfer";
+type Open = "none" | "deposit" | "withdrawal" | "transfer" | "account";
 
 export function KidWallet({ familyId, walletId }: { familyId: string; walletId: string }) {
   const [family, setFamily] = useState<FamilyView | null>(null);
@@ -105,6 +106,11 @@ export function KidWallet({ familyId, walletId }: { familyId: string; walletId: 
         {wallet.accounts.map((account) => (
           <AccountCard key={account.id} account={account} />
         ))}
+        {mayChange && (
+          <Button variant="secondary" onClick={() => setOpen("account")}>
+            New account
+          </Button>
+        )}
       </section>
 
       <section className="flex flex-col gap-1">
@@ -156,7 +162,17 @@ export function KidWallet({ familyId, walletId }: { familyId: string; walletId: 
           onDone={changed}
         />
       )}
-      <TransferSheet open={open === "transfer"} familyId={familyId} wallet={wallet} onClose={close} onDone={changed} />
+      <NewAccountSheet
+        open={open === "account"}
+        familyId={familyId}
+        wallet={wallet}
+        onClose={close}
+        onDone={changed}
+      />
+      {/* Keyed by the Accounts so its From and To start fresh when one is opened. */}
+      <TransferSheet
+        key={wallet.accounts.map((a) => a.id).join()}
+        open={open === "transfer"} familyId={familyId} wallet={wallet} onClose={close} onDone={changed} />
     </Screen>
   );
 }
