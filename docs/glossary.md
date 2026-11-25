@@ -66,6 +66,10 @@ logins per Family with Roles, and several Accounts per Kid inside one Wallet.
   ("Lego set, 400 kr by summer"). An Account with a Savings goal is a savings Account.
   Reaching the goal is celebrated, but does not lock the money.
 
+**Goal reached**
+: The moment an Account's Balance first reaches its Savings goal. Recorded once per goal,
+  so the app can celebrate it with the Kid. Setting a new goal starts over.
+
 **Amount**
 : A non-negative quantity of money in **minor units** (öre, cents) as an integer, plus a Currency.
   `12,50 kr` is `{ "minor": 1250, "currency": "SEK" }`. Never a float. A zero Amount is
@@ -105,9 +109,15 @@ logins per Family with Roles, and several Accounts per Kid inside one Wallet.
   Transactions; we correct them, like a real bank. A Transaction can be corrected once;
   correcting one side of a Transfer corrects both.
 
+**Direction**
+: Whether a Transaction brings money **in** to its Account or takes it **out**. Amounts are
+  always positive; the Direction carries the sign. *Avoid:* sign, credit/debit.
+
 **Category**
 : Why money moved, as a teaching label (not accounting): `allowance`, `chore`, `gift`,
-  `interest`, `purchase`, `donation`, `transfer`, `correction`.
+  `interest`, `purchase`, `donation`, `transfer`, `correction`. A Deposit carries one of
+  `allowance`, `chore`, `gift`, `interest`; a Withdrawal one of `purchase`, `donation`;
+  `transfer` and `correction` are set by the system.
 
 **Memo**
 : A short, Kid-readable text on a Transaction ("Pocket money week 48", "LEGO"). *Avoid:* note, comment.
@@ -130,3 +140,14 @@ logins per Family with Roles, and several Accounts per Kid inside one Wallet.
 **Actor**
 : The Member who caused something to happen. Stored on every Transaction; must be an
   active Owner or Parent of the Kid's Family.
+
+**Command**
+: Something a Member asks the domain to do ("Deposit 20 kr"). Accepted or rejected as a
+  whole, with a reason when rejected.
+
+**Event**
+: A fact the domain has recorded ("Transfer recorded"). Past tense, immutable.
+
+**History**
+: The ordered list of a Wallet's Events, starting with the Wallet being opened. The Wallet's
+  state is rebuilt from it; nothing else is the source of truth.
