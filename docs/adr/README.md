@@ -12,3 +12,4 @@ New ADR: copy [`template.md`](template.md), take the next number, add it below.
 | 0005 | [Postgres schema-less: JSONB documents + ledger](0005-postgres-document-storage.md) | proposed |
 | 0006 | [Test-driven development](0006-test-driven-development.md)               | accepted |
 | 0007 | [Deploy as one container on Sliplane](0007-deploy-on-sliplane.md)        | proposed |
+| 0008 | [Aggregates are pure deciders over their history](0008-aggregates-as-pure-deciders.md) | proposed |
