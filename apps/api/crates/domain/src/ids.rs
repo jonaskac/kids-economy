@@ -28,6 +28,14 @@ id!(
     FamilyId
 );
 id!(
+    /// A User: an identity that can sign in.
+    UserId
+);
+id!(
+    /// An Invitation to join a Family.
+    InvitationId
+);
+id!(
     /// A Member of a Family (an adult with a sign-in).
     MemberId
 );

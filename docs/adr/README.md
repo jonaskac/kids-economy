@@ -14,3 +14,5 @@ New ADR: copy [`template.md`](template.md), take the next number, add it below.
 | 0007 | [Deploy as one container on Sliplane](0007-deploy-on-sliplane.md)        | proposed |
 | 0008 | [Aggregates are pure deciders over their history](0008-aggregates-as-pure-deciders.md) | proposed |
 | 0009 | [Wallet History in Postgres, numbered per Wallet](0009-wallet-history-in-postgres.md) | proposed |
+| 0010 | [Families and Users as documents, decided like the Wallet](0010-families-and-users-as-documents.md) | proposed |
+| 0011 | [Sign in with email and password; Invitations as links](0011-password-sign-in-and-invitation-links.md) | accepted |

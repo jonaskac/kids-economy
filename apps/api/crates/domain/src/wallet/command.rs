@@ -4,16 +4,9 @@ use super::account::SavingsGoal;
 use super::transaction::{DepositCategory, WithdrawalCategory};
 use crate::ids::{AccountId, FamilyId, KidId, TransactionId, WalletId};
 use crate::money::{Amount, Currency};
-use crate::role::Actor;
+pub use crate::role::Context;
 use crate::text::{AccountName, Memo};
-use time::{Date, OffsetDateTime};
-
-/// Who is asking, and the server time the command is handled at.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Context {
-    pub actor: Actor,
-    pub now: OffsetDateTime,
-}
+use time::Date;
 
 /// Opens a Kid's Wallet together with its Main account (done when the Kid is added).
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -36,3 +36,19 @@ fn memo_is_short_kid_readable_text() {
         })
     );
 }
+
+#[test]
+fn names_of_families_kids_and_people_are_trimmed_and_bounded() {
+    assert_eq!(
+        FamilyName::new(" The Kacs ").map(|n| n.as_str().to_owned()),
+        Ok("The Kacs".to_owned())
+    );
+    assert_eq!(KidName::new("  "), Err(TextError::Empty));
+    assert_eq!(
+        PersonName::new("x".repeat(PersonName::MAX_CHARS + 1)),
+        Err(TextError::TooLong {
+            max: PersonName::MAX_CHARS
+        })
+    );
+    assert!(KidName::new("Elsa").is_ok());
+}

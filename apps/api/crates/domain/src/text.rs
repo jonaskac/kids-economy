@@ -1,4 +1,4 @@
-//! Short, Kid-readable texts: Account names, Savings goal names and Memos.
+//! Short, Kid-readable texts: names of Families, Kids, people and Accounts, and Memos.
 
 use thiserror::Error;
 
@@ -21,37 +21,52 @@ fn checked(text: &str, max: usize) -> Result<String, TextError> {
     Ok(trimmed.to_owned())
 }
 
-/// Name of an Account or a Savings goal ("Fun stuff", "Lego set").
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct AccountName(String);
+macro_rules! short_text {
+    ($(#[$doc:meta])* $name:ident, $max:expr) => {
+        $(#[$doc])*
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        pub struct $name(String);
 
-impl AccountName {
-    pub const MAX_CHARS: usize = 40;
+        impl $name {
+            pub const MAX_CHARS: usize = $max;
 
-    pub fn new(text: impl AsRef<str>) -> Result<Self, TextError> {
-        checked(text.as_ref(), Self::MAX_CHARS).map(Self)
-    }
+            /// Trims the text; it must not be blank or longer than `MAX_CHARS`.
+            pub fn new(text: impl AsRef<str>) -> Result<Self, TextError> {
+                checked(text.as_ref(), Self::MAX_CHARS).map(Self)
+            }
 
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
+    };
 }
 
-/// A short, Kid-readable text on a Transaction ("Pocket money week 48").
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Memo(String);
-
-impl Memo {
-    pub const MAX_CHARS: usize = 80;
-
-    pub fn new(text: impl AsRef<str>) -> Result<Self, TextError> {
-        checked(text.as_ref(), Self::MAX_CHARS).map(Self)
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
+short_text!(
+    /// Name of an Account or a Savings goal ("Fun stuff", "Lego set").
+    AccountName,
+    40
+);
+short_text!(
+    /// A short, Kid-readable text on a Transaction ("Pocket money week 48").
+    Memo,
+    80
+);
+short_text!(
+    /// Name of a Family ("The Kacs").
+    FamilyName,
+    60
+);
+short_text!(
+    /// A Kid's name as the Family uses it ("Elsa").
+    KidName,
+    40
+);
+short_text!(
+    /// An adult's name as other Members see it ("Mormor", "Jonas").
+    PersonName,
+    60
+);
 
 #[cfg(test)]
 #[path = "text_tests.rs"]

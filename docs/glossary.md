@@ -15,11 +15,17 @@ logins per Family with Roles, and several Accounts per Kid inside one Wallet.
 **User**
 : Technical identity that can authenticate (email, credentials). A User joins a Family as a
   Member; one User can be a Member of several Families (a grandparent with grandkids in two
-  Families). Kept separate so a Kid can become a User later.
+  Families). Kept separate so a Kid can become a User later. Signs in with an email
+  address and a password (ADR-0011).
+
+**Session**
+: One User signed in on one device. A secret held in a cookie; only its hash is stored.
+  Ends at sign-out or 30 days after sign-in. *Avoid:* login (as a noun), token (in UI).
 
 **Member**
 : An adult with their own sign-in in a Family: a parent, a grandparent, an aunt. Has exactly
   one Role. Members are removed, never deleted, so their past Transactions still name them.
+  A Member may remove themselves (leave the Family); only an Owner removes others.
   *Avoid:* user (for this meaning), account holder.
 
 **Role**
@@ -39,8 +45,14 @@ logins per Family with Roles, and several Accounts per Kid inside one Wallet.
   relatives). Any command from a Viewer is rejected as not allowed. *Avoid:* guest, read-only user.
 
 **Invitation**
-: A pending offer, sent by an Owner to an email address, to join a Family with a given Role.
-  Accepted by signing in; expires after a set time.
+: An offer, made by an Owner for one email address, to join a Family with a given Role.
+  It is **pending** until it is **accepted** (a User signed in with that email opens the
+  Invitation link and joins), **revoked** by an Owner, or **expired** (7 days after it was
+  made). Only one pending Invitation per email address in a Family.
+
+**Invitation link**
+: The secret link that carries an Invitation. Shown to the Owner once, who shares it any way
+  they like (SMS, WhatsApp, in person); only a hash of its secret is stored.
 
 **Kid**
 : A child in a Family who owns exactly one Wallet. Archived, never deleted. In v1 a Kid
