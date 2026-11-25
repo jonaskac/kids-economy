@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-25
 deciders: [Jonas]
 ---
@@ -27,7 +27,7 @@ that still needs no outside service.
 
 ## Decision outcome
 
-Chosen option: 1 (proposed by Claude, pending Jonas's confirmation), because it reuses the
+Chosen option: 1 (Jonas, 2026-11-25), because it reuses the
 Invitation link pattern and an Owner can do it from the app.
 
 - An Owner of a Family may make a link for any active Member of that Family (the domain
