@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Avatar, BalanceStat, Button, KID_COLOURS, SelectField, Sheet, TextField } from "@kids-economy/design-system";
 import { api, ApiFailure, type FamilyView, type Me } from "../api";
-import { membersPath, navigate, walletPath } from "../router";
+import { navigate, settingsPath, walletPath } from "../router";
 import { AppLink, ErrorText } from "./parts";
 import { Screen } from "./Screen";
 
@@ -27,6 +27,9 @@ export function FamilyHome({ me, onSignOut, onFamilyStarted }: FamilyHomeProps) 
   if (!family) return <p className="p-4 text-muted">Loading…</p>;
 
   const mayManageKids = family.you.role !== "viewer";
+  // Hidden Kids keep their colour, so a Kid looks the same once shown again.
+  const shown = family.kids.flatMap((kid, index) => (kid.hidden ? [] : [{ kid, index }]));
+  const hiddenCount = family.kids.length - shown.length;
   return (
     <Screen>
       <header className="flex items-center justify-between gap-3 pt-2">
@@ -46,11 +49,11 @@ export function FamilyHome({ me, onSignOut, onFamilyStarted }: FamilyHomeProps) 
             Add a kid to open their Wallet and record their first Deposit.
           </p>
         </section>
-      ) : (
+      ) : shown.length === 0 ? null : (
         <>
           <p className="m-0 text-muted">Pick a kid to show them their money.</p>
           <ul className="m-0 flex list-none flex-col gap-4 p-0">
-            {family.kids.map((kid, index) => (
+            {shown.map(({ kid, index }) => (
               <li key={kid.id}>
                 <a
                   href={walletPath(family.id, kid.wallet_id)}
@@ -72,14 +75,20 @@ export function FamilyHome({ me, onSignOut, onFamilyStarted }: FamilyHomeProps) 
           </ul>
         </>
       )}
+      {hiddenCount > 0 && (
+        <p className="m-0 text-[15px] leading-5 font-semibold text-muted">
+          {hiddenCount === 1 ? "1 kid is hidden." : `${hiddenCount} kids are hidden.`} Show them again in Family
+          settings.
+        </p>
+      )}
 
       {mayManageKids && (
         <Button variant="secondary" size="lg" onClick={() => setAdding(true)}>
           Add a kid
         </Button>
       )}
-      <AppLink to={membersPath(family.id)} className="justify-center">
-        Family members
+      <AppLink to={settingsPath(family.id)} className="justify-center">
+        Family settings
       </AppLink>
       <AddKidSheet
         open={adding}

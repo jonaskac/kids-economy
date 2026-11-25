@@ -81,6 +81,10 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/families/{family_id}/kids", post(families::add_kid))
         .route(
+            "/api/families/{family_id}/kids/{kid_id}",
+            patch(families::change_kid),
+        )
+        .route(
             "/api/families/{family_id}/kids/{kid_id}/archive",
             post(families::archive_kid),
         )
@@ -107,6 +111,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/families/{family_id}/wallets/{wallet_id}/accounts",
             post(wallets::open_account),
+        )
+        .route(
+            "/api/families/{family_id}/wallets/{wallet_id}/accounts/{account_id}/close",
+            post(wallets::close_account),
         )
         .route("/api/invitations/{secret}", get(invitations::preview))
         .route(

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiFailure, type Me } from "./api";
-import { matchMembers, matchSecret, matchWallet, navigate, usePath } from "./router";
+import { matchSecret, matchSettings, matchWallet, navigate, usePath } from "./router";
 import { FamilyHome } from "./screens/FamilyHome";
-import { FamilyMembers } from "./screens/FamilyMembers";
+import { FamilySettings } from "./screens/FamilySettings";
 import { JoinFamily } from "./screens/JoinFamily";
 import { KidWallet } from "./screens/KidWallet";
 import { ResetPassword } from "./screens/ResetPassword";
@@ -72,9 +72,9 @@ export function App() {
   if (wallet) {
     return <KidWallet familyId={wallet.familyId} walletId={wallet.walletId} />;
   }
-  const members = matchMembers(path);
-  if (members) {
-    return <FamilyMembers familyId={members.familyId} />;
+  const settings = matchSettings(path);
+  if (settings) {
+    return <FamilySettings familyId={settings.familyId} />;
   }
   return <FamilyHome me={session.me} onSignOut={signOut} onFamilyStarted={load} />;
 }

@@ -37,7 +37,7 @@ logins per Family with Roles, and several Accounts per Kid inside one Wallet.
   normal case. *Avoid:* admin.
 
 **Parent**
-: Role that may add and archive Kids, open and close Accounts, set Savings goals and record
+: Role that may add, rename, hide and archive Kids, open and close Accounts, set Savings goals and record
   Deposits, Withdrawals, Transfers and Corrections. *Avoid:* guardian, admin.
 
 **Viewer**
@@ -60,8 +60,15 @@ logins per Family with Roles, and several Accounts per Kid inside one Wallet.
   other device. Works once, for 24 hours; only a hash of its secret is stored.
 
 **Kid**
-: A child in a Family who owns exactly one Wallet. Archived, never deleted. In v1 a Kid
-  cannot sign in. *Avoid:* child (in code), user, member.
+: A child in a Family who owns exactly one Wallet. Archived, never deleted: "Remove kid" in
+  the app archives them, keeping their Wallet and History, and no Member sees them after.
+  A Kid's name can be fixed (renamed) while they are active. In v1 a Kid cannot sign in.
+  *Avoid:* child (in code), user, member.
+
+**Hidden kid**
+: An active Kid left off the Family home, for the whole Family, but still listed in Family
+  settings. Their Wallet keeps working. Shown again with one tap (ADR-0013).
+  *Avoid:* inactive, disabled.
 
 ## Money
 
@@ -71,8 +78,15 @@ logins per Family with Roles, and several Accounts per Kid inside one Wallet.
 
 **Account**
 : One named pot of fictitious money in a Wallet ("Fun stuff", "Lego set"). Holds a Ledger;
-  its Balance is derived. Closed only when its Balance is zero, never deleted.
+  its Balance is derived. Closed, never deleted (see Closed account).
   *Avoid:* jar, piggy bank (in code — fine as UI copy).
+
+**Closed account**
+: An Account that no longer takes Transactions. Closing moves whatever is left, as one
+  Transfer, to the Main account or another open Account the Parent picks, then closes it in
+  the same step; the Wallet total stays (ADR-0013). Its Ledger is kept and its Transactions
+  still show in History under its name. No reopening in v1. *Avoid:* archived account,
+  deleted account (in code — "Close account" is the UI copy).
 
 **Main account**
 : The Account where money lands when no Account is chosen. Every Wallet has exactly one,

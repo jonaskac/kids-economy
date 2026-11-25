@@ -4,6 +4,8 @@ const VARIANTS = {
   primary: "bg-brand text-on-brand border-transparent",
   secondary: "bg-surface-raised text-ink border-line-strong",
   quiet: "bg-transparent text-brand border-transparent hover:bg-brand-soft",
+  /** For actions that cannot be undone from the app, like removing a Kid. */
+  danger: "bg-surface-raised text-danger border-danger",
 } as const;
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

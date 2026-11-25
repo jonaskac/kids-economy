@@ -234,7 +234,7 @@ describe("joining by Invitation link", () => {
   });
 });
 
-describe("Family members", () => {
+describe("Family settings: members", () => {
   const withMembers = () => ({
     ...family(),
     members: [
@@ -254,7 +254,7 @@ describe("Family members", () => {
       }),
     });
     render(<App />);
-    await userEvent.click(await screen.findByRole("link", { name: "Family members" }));
+    await userEvent.click(await screen.findByRole("link", { name: "Family settings" }));
 
     const list = await screen.findByRole("list", { name: "Members" });
     expect(within(list).getByText("Mormor")).toBeInTheDocument();

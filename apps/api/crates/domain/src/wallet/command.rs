@@ -30,8 +30,14 @@ pub enum WalletCommand {
         account_id: AccountId,
         savings_goal: Option<SavingsGoal>,
     },
+    /// Closes an Account. Whatever is left on it moves first, with a Transfer, to
+    /// `move_to` (`None` means the Main account), so the Wallet total stays (ADR-0013).
     CloseAccount {
         account_id: AccountId,
+        move_to: Option<AccountId>,
+        /// The Transfer's Memo, used only when there is money to move.
+        memo: Memo,
+        occurred_on: Date,
     },
     Deposit {
         /// `None` means the Main account.

@@ -156,6 +156,9 @@ struct KidV1 {
     name: String,
     wallet_id: Uuid,
     added_at: String,
+    /// Added after v1 shipped; Kids stored before it are shown (ADR-0013).
+    #[serde(default)]
+    hidden: bool,
     archived_at: Option<String>,
 }
 
@@ -228,6 +231,7 @@ pub fn encode_family(family: &Family) -> Result<Value, DocumentError> {
                 name: k.name.as_str().to_owned(),
                 wallet_id: k.wallet_id.as_uuid(),
                 added_at: time_out(k.added_at)?,
+                hidden: k.hidden,
                 archived_at: optional_out(k.archived_at)?,
             })
         })
@@ -292,6 +296,7 @@ pub fn decode_family(id: Uuid, body: Value) -> Result<Family, DocumentError> {
                 name: KidName::new(k.name)?,
                 wallet_id: WalletId::from_uuid(k.wallet_id),
                 added_at: time_in(&k.added_at)?,
+                hidden: k.hidden,
                 archived_at: optional_in(k.archived_at)?,
             })
         })

@@ -18,8 +18,8 @@ pub enum WalletError {
     InsufficientFunds,
     #[error("the Wallet total would be too large")]
     TotalOverflow,
-    #[error("an Account closes only at a zero Balance")]
-    NonZeroBalance,
+    #[error("the Wallet's history adds up to something impossible")]
+    Corrupt,
     #[error("the Main account cannot be closed")]
     MainAccount,
     #[error("no such Transaction in this Wallet")]

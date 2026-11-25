@@ -77,6 +77,13 @@ pub struct NewKid {
     name: String,
 }
 
+/// Body of `PATCH …/kids/{kid_id}`: what to change; left-out fields stay.
+#[derive(Debug, Deserialize)]
+pub struct KidChange {
+    name: Option<String>,
+    hidden: Option<bool>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct You {
     member_id: Uuid,
@@ -113,6 +120,8 @@ pub struct KidDto {
     id: Uuid,
     name: String,
     wallet_id: Uuid,
+    /// Left off the Family home; still shown in Family settings.
+    hidden: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     wallet_total: Option<MoneyDto>,
 }
@@ -303,6 +312,7 @@ pub async fn add_kid(
                         id: kid.id.as_uuid(),
                         name: kid.name.as_str().to_owned(),
                         wallet_id: kid.wallet_id.as_uuid(),
+                        hidden: kid.hidden,
                         wallet_total: None,
                     }),
                 ))
@@ -312,6 +322,44 @@ pub async fn add_kid(
         }
     }
     Err(ApiError::Conflict)
+}
+
+/// `PATCH /api/families/{id}/kids/{kid_id}`: an Owner or Parent fixes a Kid's name
+/// and hides or shows them on the Family home, all or nothing.
+pub async fn change_kid(
+    State(state): State<AppState>,
+    signed_in: SignedIn,
+    Path((family_id, kid_id)): Path<(Uuid, Uuid)>,
+    Json(body): Json<KidChange>,
+) -> Result<StatusCode, ApiError> {
+    let kid_id = KidId::from_uuid(kid_id);
+    let mut commands = Vec::new();
+    if let Some(name) = &body.name {
+        commands.push(FamilyCommand::RenameKid {
+            kid_id,
+            name: KidName::new(name)?,
+        });
+    }
+    match body.hidden {
+        Some(true) => commands.push(FamilyCommand::HideKid { kid_id }),
+        Some(false) => commands.push(FamilyCommand::ShowKid { kid_id }),
+        None => {}
+    }
+    change(&state, family_id, &signed_in.user, |family, context| {
+        let mut next = family.clone();
+        let mut events = Vec::new();
+        for command in &commands {
+            let decided = next.decide(command, &context, &mut RandomIds)?;
+            for event in &decided {
+                // Decided events always apply; a failure means the Kid is gone.
+                next.apply(event).map_err(|_| FamilyError::UnknownKid)?;
+            }
+            events.extend(decided);
+        }
+        Ok(events)
+    })
+    .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// `POST /api/families/{id}/kids/{kid_id}/archive`: an Owner or Parent archives a Kid.
@@ -430,6 +478,7 @@ async fn view_of(state: &AppState, family: &Family, user: &User) -> Result<Famil
             id: kid.id.as_uuid(),
             name: kid.name.as_str().to_owned(),
             wallet_id: kid.wallet_id.as_uuid(),
+            hidden: kid.hidden,
             wallet_total: total.map(|total| MoneyDto {
                 minor: total.minor(),
                 currency: total.currency().code().to_owned(),

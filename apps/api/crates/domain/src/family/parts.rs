@@ -111,6 +111,8 @@ pub struct Kid {
     pub name: KidName,
     pub wallet_id: WalletId,
     pub added_at: OffsetDateTime,
+    /// Left off the Family home, but still active: the Wallet keeps working.
+    pub hidden: bool,
     pub archived_at: Option<OffsetDateTime>,
 }
 

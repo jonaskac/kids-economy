@@ -4,7 +4,7 @@ use super::parts::{Invitation, Kid, Member};
 use crate::ids::{FamilyId, InvitationId, KidId, MemberId};
 use crate::money::Currency;
 use crate::role::Role;
-use crate::text::FamilyName;
+use crate::text::{FamilyName, KidName};
 use time::OffsetDateTime;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,6 +38,16 @@ pub enum FamilyEvent {
     },
     KidAdded {
         kid: Kid,
+    },
+    KidRenamed {
+        kid_id: KidId,
+        name: KidName,
+    },
+    KidHidden {
+        kid_id: KidId,
+    },
+    KidShown {
+        kid_id: KidId,
     },
     KidArchived {
         kid_id: KidId,

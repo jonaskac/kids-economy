@@ -17,3 +17,4 @@ New ADR: copy [`template.md`](template.md), take the next number, add it below.
 | 0010 | [Families and Users as documents, decided like the Wallet](0010-families-and-users-as-documents.md) | proposed |
 | 0011 | [Sign in with email and password; Invitations as links](0011-password-sign-in-and-invitation-links.md) | accepted |
 | 0012 | [Password reset links, made by an Owner for a Member](0012-password-reset-links-made-by-owners.md) | accepted |
+| 0013 | [Closing an Account moves its money; Kids are hidden, renamed and archived, never deleted](0013-closing-accounts-and-removing-kids-keep-history.md) | proposed |

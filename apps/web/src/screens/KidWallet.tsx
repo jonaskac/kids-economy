@@ -11,6 +11,7 @@ import {
 import { api, type Account, type FamilyView, type Transaction, type WalletView } from "../api";
 import { navigate } from "../router";
 import { CATEGORY_LABEL, shortDay, transactionWord } from "../words";
+import { CloseAccountSheet } from "./CloseAccountSheet";
 import { CorrectionSheet } from "./CorrectionSheet";
 import { MoneySheet } from "./MoneySheet";
 import { NewAccountSheet } from "./NewAccountSheet";
@@ -24,6 +25,7 @@ export function KidWallet({ familyId, walletId }: { familyId: string; walletId: 
   const [wallet, setWallet] = useState<WalletView | null>(null);
   const [open, setOpen] = useState<Open>("none");
   const [correcting, setCorrecting] = useState<Transaction | null>(null);
+  const [closing, setClosing] = useState<Account | null>(null);
 
   useEffect(() => {
     void api.family(familyId).then(setFamily);
@@ -36,10 +38,12 @@ export function KidWallet({ familyId, walletId }: { familyId: string; walletId: 
   const kidIndex = family.kids.findIndex((k) => k.wallet_id === wallet.id);
   const mayChange = family.you.role !== "viewer";
   const accountName = new Map(wallet.accounts.map((a) => [a.id, a.name]));
+  const closedName = new Map(wallet.closed_accounts.map((a) => [a.id, `${a.name} (closed)`]));
   const changed = (next: WalletView) => {
     setWallet(next);
     setOpen("none");
     setCorrecting(null);
+    setClosing(null);
   };
   const corrected = new Set(wallet.transactions.flatMap((t) => (t.corrects ? [t.corrects] : [])));
   const mayCorrect = (t: Transaction) =>
@@ -104,7 +108,11 @@ export function KidWallet({ familyId, walletId }: { familyId: string; walletId: 
       <section className="flex flex-col gap-3">
         <h2 className="m-0 font-display text-[22px] leading-7 font-semibold">Accounts</h2>
         {wallet.accounts.map((account) => (
-          <AccountCard key={account.id} account={account} />
+          <AccountCard
+            key={account.id}
+            account={account}
+            {...(mayChange && !account.main ? { onClose: () => setClosing(account) } : {})}
+          />
         ))}
         {mayChange && (
           <Button variant="secondary" onClick={() => setOpen("account")}>
@@ -125,7 +133,7 @@ export function KidWallet({ familyId, walletId }: { familyId: string; walletId: 
               <TransactionRow
                 key={t.id}
                 memo={t.memo}
-                meta={`${CATEGORY_LABEL[t.category]} · ${shortDay(t.occurred_on)} · ${accountName.get(t.account_id) ?? "Closed account"}`}
+                meta={`${CATEGORY_LABEL[t.category]} · ${shortDay(t.occurred_on)} · ${accountName.get(t.account_id) ?? closedName.get(t.account_id) ?? "Closed account"}`}
                 amount={t.amount}
                 direction={t.direction}
                 word={transactionWord(t.category)}
@@ -162,6 +170,15 @@ export function KidWallet({ familyId, walletId }: { familyId: string; walletId: 
           onDone={changed}
         />
       )}
+      {closing && (
+        <CloseAccountSheet
+          account={closing}
+          familyId={familyId}
+          wallet={wallet}
+          onClose={() => setClosing(null)}
+          onDone={changed}
+        />
+      )}
       <NewAccountSheet
         open={open === "account"}
         familyId={familyId}
@@ -177,7 +194,8 @@ export function KidWallet({ familyId, walletId }: { familyId: string; walletId: 
   );
 }
 
-function AccountCard({ account }: { account: Account }) {
+/** One Account; `onClose` offers to close it (never the Main account, never to a Viewer). */
+function AccountCard({ account, onClose }: { account: Account; onClose?: () => void }) {
   const goal = account.savings_goal;
   const caption = account.main ? "New money lands here" : goal ? `Savings · ${goal.name}` : "For spending";
   return (
@@ -190,6 +208,11 @@ function AccountCard({ account }: { account: Account }) {
         <AmountText amount={account.balance} className="text-[28px]" />
       </div>
       {goal && <ProgressRing label={goal.name} saved={account.balance} target={goal.target} />}
+      {onClose && (
+        <Button variant="quiet" className="self-start px-3" aria-label={`Close ${account.name}`} onClick={onClose}>
+          Close account
+        </Button>
+      )}
     </article>
   );
 }

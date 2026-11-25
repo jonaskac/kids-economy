@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Button, SelectField, Sheet, TextField } from "@kids-economy/design-system";
-import { api, ApiFailure, type FamilyView, type Role } from "../api";
+import { Avatar, Button, KID_COLOURS, SelectField, Sheet, TextField } from "@kids-economy/design-system";
+import { api, ApiFailure, type FamilyView, type KidSummary, type Role } from "../api";
 import { shareableUrl } from "../router";
 import { shortDay } from "../words";
 import { BackToFamily, CopyLink, ErrorText } from "./parts";
@@ -10,11 +10,15 @@ export const ROLE_WORD: Record<Role, string> = { owner: "Owner", parent: "Parent
 
 type Member = FamilyView["members"][number];
 
-/** `/families/{id}/members`: the adults in the Family; Owners invite and reset passwords. */
-export function FamilyMembers({ familyId }: { familyId: string }) {
+/**
+ * `/families/{id}/settings`: the Family's Kids and adults. Owners and Parents fix, hide and
+ * remove Kids; Owners invite and reset passwords.
+ */
+export function FamilySettings({ familyId }: { familyId: string }) {
   const [family, setFamily] = useState<FamilyView | null>(null);
   const [inviting, setInviting] = useState(false);
   const [resetting, setResetting] = useState<Member | null>(null);
+  const [editing, setEditing] = useState<KidSummary | null>(null);
 
   const reload = useCallback(() => {
     void api.family(familyId).then(setFamily);
@@ -23,13 +27,45 @@ export function FamilyMembers({ familyId }: { familyId: string }) {
 
   if (!family) return <p className="p-4 text-muted">Loading…</p>;
   const isOwner = family.you.role === "owner";
+  const mayManageKids = family.you.role !== "viewer";
 
   return (
     <Screen>
       <header className="flex items-center">
         <BackToFamily />
       </header>
-      <h1 className="m-0 font-display text-[28px] leading-[34px] font-semibold">Family members</h1>
+      <h1 className="m-0 font-display text-[28px] leading-[34px] font-semibold">Family settings</h1>
+
+      {family.kids.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 id="kids" className="m-0 font-display text-[22px] leading-7 font-semibold">
+            Kids
+          </h2>
+          <ul aria-labelledby="kids" className="m-0 flex list-none flex-col p-0">
+            {family.kids.map((kid, index) => (
+              <li key={kid.id} className="flex items-center gap-3 border-b border-line py-3 last:border-b-0">
+                <Avatar name={kid.name} colour={KID_COLOURS[index % KID_COLOURS.length]} />
+                <span className="min-w-0 grow">
+                  <span className="block text-[19px] leading-[26px] font-bold [overflow-wrap:anywhere]">{kid.name}</span>
+                  {kid.hidden && (
+                    <span className="block text-sm font-semibold text-muted">Hidden from Family home</span>
+                  )}
+                </span>
+                {mayManageKids && (
+                  <Button
+                    variant="quiet"
+                    className="flex-none px-3"
+                    aria-label={`Edit ${kid.name}`}
+                    onClick={() => setEditing(kid)}
+                  >
+                    Edit
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="flex flex-col gap-2">
         <h2 id="members" className="m-0 font-display text-[22px] leading-7 font-semibold">
@@ -91,6 +127,17 @@ export function FamilyMembers({ familyId }: { familyId: string }) {
           familyId={familyId}
           onClose={() => {
             setInviting(false);
+            reload();
+          }}
+        />
+      )}
+      {editing && (
+        <KidSheet
+          familyId={familyId}
+          kid={editing}
+          onClose={() => setEditing(null)}
+          onChanged={() => {
+            setEditing(null);
             reload();
           }}
         />
@@ -198,6 +245,109 @@ function ResetSheet({ familyId, member, onClose }: { familyId: string; member: M
           </p>
         </>
       )}
+      {error && <ErrorText>{error}</ErrorText>}
+    </Sheet>
+  );
+}
+
+/** Same limit as the API's KidName. */
+const KID_NAME_MAX = 40;
+
+/** Fixes a Kid's name, hides or shows them on the Family home, or removes them. */
+function KidSheet({
+  familyId,
+  kid,
+  onClose,
+  onChanged,
+}: {
+  familyId: string;
+  kid: KidSummary;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [name, setName] = useState(kid.name);
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
+  const trimmed = name.trim();
+  const letters = [...trimmed].length;
+  const nameProblem = letters > KID_NAME_MAX ? `Use at most ${KID_NAME_MAX} letters (this has ${letters}).` : undefined;
+  const nameReady = trimmed !== "" && !nameProblem && trimmed !== kid.name;
+
+  const run = async (action: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await action();
+      onChanged();
+    } catch {
+      setError("Could not save right now. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const rename = (event: FormEvent) => {
+    event.preventDefault();
+    if (nameReady) void run(() => api.changeKid(familyId, kid.id, { name: trimmed }));
+  };
+
+  if (asking) {
+    return (
+      <Sheet
+        open
+        title={`Remove ${kid.name}?`}
+        description={`${kid.name}'s Wallet and history are kept, but no one in the Family sees them after this. To keep them and only tidy the Family home, hide ${kid.name} instead.`}
+        onClose={() => setAsking(false)}
+        actions={
+          <Button
+            variant="danger"
+            size="lg"
+            disabled={busy}
+            onClick={() => void run(() => api.removeKid(familyId, kid.id))}
+          >
+            Yes, remove {kid.name}
+          </Button>
+        }
+      >
+        {error && <ErrorText>{error}</ErrorText>}
+      </Sheet>
+    );
+  }
+
+  return (
+    <Sheet open title={`Edit ${kid.name}`} onClose={onClose}>
+      <form onSubmit={rename} className="flex flex-col gap-3">
+        <TextField
+          label="Name"
+          hint="Fix a name typed wrong. Their money stays the same."
+          value={name}
+          onChange={setName}
+          error={nameProblem}
+          autoComplete="off"
+        />
+        <Button type="submit" variant="secondary" disabled={!nameReady || busy}>
+          Save name
+        </Button>
+      </form>
+      <div className="flex flex-col gap-2 border-t border-line pt-4">
+        <p className="m-0 text-[15px] leading-5 font-semibold text-muted">
+          {kid.hidden
+            ? `${kid.name} is hidden from the Family home.`
+            : `Hiding takes ${kid.name} off the Family home. Their money stays and keeps working.`}
+        </p>
+        <Button
+          variant="secondary"
+          disabled={busy}
+          onClick={() => void run(() => api.changeKid(familyId, kid.id, { hidden: !kid.hidden }))}
+        >
+          {kid.hidden ? "Show on Family home" : "Hide from Family home"}
+        </Button>
+      </div>
+      <div className="flex flex-col gap-2 border-t border-line pt-4">
+        <Button variant="danger" disabled={busy} onClick={() => setAsking(true)}>
+          Remove {kid.name}
+        </Button>
+      </div>
       {error && <ErrorText>{error}</ErrorText>}
     </Sheet>
   );
