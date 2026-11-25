@@ -53,6 +53,8 @@ ledger_events (
 
 - Only identity, tenancy, ordering and concurrency columns are fixed; everything
   else is JSONB and validated in the Rust domain layer, not by the database.
+- Amended by [ADR-0009](0009-wallet-history-in-postgres.md): `ledger_events` is keyed per
+  Wallet, `(wallet_id, sequence)`, not per Account, and carries `family_id`.
 - The `(account_id, sequence)` primary key makes concurrent writes to the same account
   conflict instead of both succeeding — this is how "can't withdraw more than you have"
   holds under concurrency.

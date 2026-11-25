@@ -151,3 +151,17 @@ logins per Family with Roles, and several Accounts per Kid inside one Wallet.
 **History**
 : The ordered list of a Wallet's Events, starting with the Wallet being opened. The Wallet's
   state is rebuilt from it; nothing else is the source of truth.
+
+**Sequence**
+: The position of an Event in its Wallet's History: 1 for the Wallet being opened, then
+  2, 3, … with no gaps. Numbered per Wallet, not per Account, because the Wallet is the
+  unit of consistency.
+
+**Version**
+: How many Events a Wallet's History holds, which is also the Sequence of its last Event.
+  A decision is made against one Version and saved only if the Wallet is still at it.
+
+**Conflict**
+: Saving a decision when the Wallet has moved past the Version it was decided on (another
+  Member recorded something first). Nothing is saved; the Command is decided again against
+  the fresh Wallet. *Avoid:* race, collision (in code).
