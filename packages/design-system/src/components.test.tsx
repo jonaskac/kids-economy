@@ -66,6 +66,29 @@ describe("TransactionRow", () => {
   });
 });
 
+describe("TransactionRow, selectable", () => {
+  it("becomes one button when it can be selected, and shows a note", async () => {
+    const onSelect = vi.fn();
+    render(
+      <ul>
+        <TransactionRow
+          memo="Pocket money"
+          meta="Sun 22 Nov · Main"
+          amount={sek(2000)}
+          direction="in"
+          word="Deposit"
+          note="Corrected"
+          onSelect={onSelect}
+        />
+      </ul>,
+    );
+    const button = screen.getByRole("button", { name: /Pocket money/ });
+    expect(button).toHaveTextContent("Corrected");
+    await userEvent.click(button);
+    expect(onSelect).toHaveBeenCalledOnce();
+  });
+});
+
 describe("Sheet", () => {
   it("is a labelled dialog that closes from its Cancel button", async () => {
     const onClose = vi.fn();

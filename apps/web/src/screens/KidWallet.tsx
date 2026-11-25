@@ -8,9 +8,10 @@ import {
   ProgressRing,
   TransactionRow,
 } from "@kids-economy/design-system";
-import { api, type Account, type FamilyView, type WalletView } from "../api";
+import { api, type Account, type FamilyView, type Transaction, type WalletView } from "../api";
 import { navigate } from "../router";
 import { CATEGORY_LABEL, shortDay, transactionWord } from "../words";
+import { CorrectionSheet } from "./CorrectionSheet";
 import { MoneySheet } from "./MoneySheet";
 import { Screen } from "./Screen";
 import { TransferSheet } from "./TransferSheet";
@@ -21,6 +22,7 @@ export function KidWallet({ familyId, walletId }: { familyId: string; walletId: 
   const [family, setFamily] = useState<FamilyView | null>(null);
   const [wallet, setWallet] = useState<WalletView | null>(null);
   const [open, setOpen] = useState<Open>("none");
+  const [correcting, setCorrecting] = useState<Transaction | null>(null);
 
   useEffect(() => {
     void api.family(familyId).then(setFamily);
@@ -36,7 +38,11 @@ export function KidWallet({ familyId, walletId }: { familyId: string; walletId: 
   const changed = (next: WalletView) => {
     setWallet(next);
     setOpen("none");
+    setCorrecting(null);
   };
+  const corrected = new Set(wallet.transactions.flatMap((t) => (t.corrects ? [t.corrects] : [])));
+  const mayCorrect = (t: Transaction) =>
+    mayChange && t.category !== "correction" && !corrected.has(t.id) && accountName.has(t.account_id);
   const close = () => setOpen("none");
 
   return (
@@ -117,6 +123,8 @@ export function KidWallet({ familyId, walletId }: { familyId: string; walletId: 
                 amount={t.amount}
                 direction={t.direction}
                 word={transactionWord(t.category)}
+                {...(corrected.has(t.id) ? { note: "Corrected" } : {})}
+                {...(mayCorrect(t) ? { onSelect: () => setCorrecting(t) } : {})}
               />
             ))}
           </ul>
@@ -139,6 +147,15 @@ export function KidWallet({ familyId, walletId }: { familyId: string; walletId: 
         onClose={close}
         onDone={changed}
       />
+      {correcting && (
+        <CorrectionSheet
+          transaction={correcting}
+          familyId={familyId}
+          wallet={wallet}
+          onClose={() => setCorrecting(null)}
+          onDone={changed}
+        />
+      )}
       <TransferSheet open={open === "transfer"} familyId={familyId} wallet={wallet} onClose={close} onDone={changed} />
     </Screen>
   );

@@ -83,6 +83,23 @@ export interface WalletView {
   transactions: Transaction[];
 }
 
+export type LinkState = "pending" | "accepted" | "revoked" | "expired";
+
+export interface InvitationPreview {
+  family_name: string;
+  email: string;
+  role: Role;
+  state: LinkState;
+  expires_at: string;
+}
+
+export interface PasswordResetPreview {
+  email: string;
+  name: string;
+  state: "pending" | "used" | "expired";
+  expires_at: string;
+}
+
 /** The API said no: its status and stable error code (docs/api.md, Conventions). */
 export class ApiFailure extends Error {
   constructor(
@@ -116,7 +133,29 @@ const wallet = (familyId: string, walletId: string) => `/api/families/${familyId
 export const api = {
   me: () => call<Me>("GET", "/api/me"),
   signIn: (email: string, password: string) => call<{ user: User }>("POST", "/api/sessions", { email, password }),
+  signUp: (body: { email: string; name: string; password: string }) =>
+    call<{ user: User }>("POST", "/api/users", body),
   signOut: () => call<undefined>("DELETE", "/api/sessions/current"),
+  createFamily: (name: string, currency: string) => call<FamilyView>("POST", "/api/families", { name, currency }),
+  invite: (familyId: string, email: string, role: Role) =>
+    call<{ link: string }>("POST", `/api/families/${familyId}/invitations`, { email, role }),
+  invitation: (secret: string) => call<InvitationPreview>("GET", `/api/invitations/${encodeURIComponent(secret)}`),
+  acceptInvitation: (secret: string) =>
+    call<{ family_id: string; member_id: string; role: Role }>(
+      "POST",
+      `/api/invitations/${encodeURIComponent(secret)}/accept`,
+      {},
+    ),
+  passwordResetLink: (familyId: string, memberId: string) =>
+    call<{ link: string; expires_at: string }>(
+      "POST",
+      `/api/families/${familyId}/members/${memberId}/password-reset`,
+      {},
+    ),
+  passwordReset: (secret: string) =>
+    call<PasswordResetPreview>("GET", `/api/password-resets/${encodeURIComponent(secret)}`),
+  resetPassword: (secret: string, password: string) =>
+    call<{ user: User }>("POST", `/api/password-resets/${encodeURIComponent(secret)}`, { password }),
   family: (familyId: string) => call<FamilyView>("GET", `/api/families/${familyId}`),
   addKid: (familyId: string, name: string) => call<KidSummary>("POST", `/api/families/${familyId}/kids`, { name }),
   wallet: (familyId: string, walletId: string) => call<WalletView>("GET", wallet(familyId, walletId)),
@@ -135,4 +174,6 @@ export const api = {
     walletId: string,
     body: { from: string; to: string; amount: Amount; memo: string },
   ) => call<WalletView>("POST", `${wallet(familyId, walletId)}/transfers`, body),
+  correct: (familyId: string, walletId: string, body: { transaction_id: string; reason: string }) =>
+    call<WalletView>("POST", `${wallet(familyId, walletId)}/corrections`, body),
 };

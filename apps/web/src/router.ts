@@ -26,3 +26,24 @@ export function matchWallet(path: string): { familyId: string; walletId: string 
   if (!match?.[1] || !match[2]) return null;
   return { familyId: match[1], walletId: match[2] };
 }
+
+/** `/families/{familyId}/members`: who is in the Family. */
+export function membersPath(familyId: string): string {
+  return `/families/${familyId}/members`;
+}
+
+export function matchMembers(path: string): { familyId: string } | null {
+  const match = /^\/families\/([^/]+)\/members\/?$/.exec(path);
+  return match?.[1] ? { familyId: match[1] } : null;
+}
+
+/** The secret of an Invitation link (`/join/<secret>`) or a Password reset link (`/reset/<secret>`). */
+export function matchSecret(path: string, prefix: "join" | "reset"): string | null {
+  const match = new RegExp(`^/${prefix}/([^/]+)/?$`).exec(path);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+/** A link the server returned (`/join/…`), as a full URL to share. */
+export function shareableUrl(link: string): string {
+  return `${window.location.origin}${link}`;
+}
