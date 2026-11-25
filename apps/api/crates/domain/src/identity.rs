@@ -1,7 +1,20 @@
 //! Identity: what a User signs in with. Hashing and Sessions live outside the domain
 //! (they need randomness and crypto); here are only the rules (ADR-0011).
 
+use crate::ids::UserId;
+use crate::text::PersonName;
 use thiserror::Error;
+use time::OffsetDateTime;
+
+/// A technical identity that can sign in, and joins Families as a Member.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct User {
+    pub id: UserId,
+    pub email: Email,
+    /// The name new Memberships start with.
+    pub name: PersonName,
+    pub registered_at: OffsetDateTime,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub enum EmailError {

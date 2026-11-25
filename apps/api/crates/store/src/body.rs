@@ -178,7 +178,7 @@ fn date_out(date: Date) -> Result<String, BodyError> {
     Ok(date.format(&Iso8601::DATE)?)
 }
 
-fn time_out(at: OffsetDateTime) -> Result<String, BodyError> {
+pub(crate) fn time_out(at: OffsetDateTime) -> Result<String, BodyError> {
     Ok(at.format(&Rfc3339)?)
 }
 
@@ -304,7 +304,7 @@ fn date_in(text: &str) -> Result<Date, BodyError> {
     Ok(Date::parse(text, &Iso8601::DATE)?)
 }
 
-fn time_in(text: &str) -> Result<OffsetDateTime, BodyError> {
+pub(crate) fn time_in(text: &str) -> Result<OffsetDateTime, BodyError> {
     Ok(OffsetDateTime::parse(text, &Rfc3339)?)
 }
 

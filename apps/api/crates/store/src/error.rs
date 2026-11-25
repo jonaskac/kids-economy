@@ -1,15 +1,29 @@
-//! Why the store could not load or save a Wallet.
+//! Why the store could not load or save a Wallet, Family, User or Session.
 
 use crate::body::BodyError;
+use crate::family_body::DocumentError;
 use domain::wallet::ReplayError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum StoreError {
-    /// The Wallet moved past the Version the decision was made on. Nothing was saved;
-    /// load the Wallet again and decide again.
-    #[error("the Wallet changed since it was loaded")]
+    /// The Wallet or Family moved past the Version the decision was made on. Nothing was
+    /// saved; load it again and decide again.
+    #[error("it changed since it was loaded")]
     Conflict,
+    /// Another User already signs in with this email address.
+    #[error("the email address is already registered")]
+    EmailTaken,
+    /// A Wallet opened together with a Kid must belong to that Kid's Family.
+    #[error("the Wallet belongs to another Family")]
+    WrongFamily,
+    /// A stored Family or User, or one about to be stored, does not fit the body format.
+    #[error("document {id} has an invalid body: {source}")]
+    Document {
+        id: uuid::Uuid,
+        #[source]
+        source: DocumentError,
+    },
     /// The Events do not continue the Wallet's History (or a stored History is broken).
     #[error("not a valid Wallet History: {0}")]
     InvalidHistory(#[from] ReplayError),
