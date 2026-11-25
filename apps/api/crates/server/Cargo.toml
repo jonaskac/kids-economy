@@ -8,6 +8,8 @@ license.workspace = true
 
 [dependencies]
 kids-http.workspace = true
+store.workspace = true
+sqlx.workspace = true
 axum.workspace = true
 tokio.workspace = true
 tracing.workspace = true
