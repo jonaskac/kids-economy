@@ -9,6 +9,14 @@ bank app.
 
 **v1 is parent-only.** A kid-facing app comes later.
 
+## Install your own
+
+[![Deploy to Sliplane](https://sliplane.opendeploy.cloud/button.svg)](https://sliplane.opendeploy.cloud/?repo=https://github.com/jonaskac/kids-economy)
+
+One click creates the app and its Postgres database in your Sliplane account, on an HTTPS
+`*.sliplane.app` address. Point your own domain at it whenever you like. Other hosts, Docker
+Compose, configuration and upgrades: [`docs/deploy.md`](docs/deploy.md).
+
 ## Monorepo layout
 
 | Path                       | What                                      | Status  |
