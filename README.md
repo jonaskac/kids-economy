@@ -13,9 +13,9 @@ bank app.
 
 | Path                       | What                                      | Status  |
 | -------------------------- | ----------------------------------------- | ------- |
-| `apps/api`                 | Rust backend (HTTP API, domain, Postgres) | skeleton |
-| `apps/web`                 | Parent web app (React + Tailwind)         | skeleton |
-| `packages/design-system`   | Our own design tokens and UI primitives   | v0       |
+| `apps/api`                 | Rust backend (HTTP API, domain, Postgres) | sign-in, Families, Wallets |
+| `apps/web`                 | Parent web app (React + Tailwind)         | first slice |
+| `packages/design-system`   | Our own design tokens and UI primitives   | v1 draft |
 | `docs/adr`                 | Architecture Decision Records             | active  |
 | `docs/glossary.md`         | Ubiquitous language                       | active  |
 | `docs/roadmap.md`          | Ordered plan of work                      | active  |
@@ -36,3 +36,26 @@ pnpm test                      # design system + web
 cd apps/api; cargo test        # Rust workspace
 cargo run -p server            # http://localhost:8080/api/health
 ```
+
+## Run the app locally with demo data
+
+Three shells (nushell). Needs Docker (for Postgres), Rust and pnpm.
+
+```nu
+# 1. Postgres
+docker run --name kids-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:16
+
+# 2. API on :8080 (runs migrations on start)
+cd apps/api
+$env.DATABASE_URL = "postgres://postgres:postgres@localhost:5432/postgres"
+cargo run -p server
+
+# 3. Demo Family, then the web app on :5173
+pnpm install
+pnpm --filter web seed
+pnpm --filter web dev
+```
+
+Open http://localhost:5173 (use your browser's phone view) and sign in as
+`jonas@example.com` (Owner) or `mormor@example.com` (Viewer), password `correct horse battery`.
+Running the seed again does nothing if the Family exists; to start over, `docker rm -f kids-pg`.

@@ -24,4 +24,9 @@ describe("Button", () => {
     render(<Button>Tap me</Button>);
     expect(screen.getByRole("button", { name: "Tap me" })).toHaveClass("min-h-11");
   });
+
+  it("comes in quieter variants for secondary actions", () => {
+    render(<Button variant="secondary">Cancel</Button>);
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveClass("border-line-strong");
+  });
 });

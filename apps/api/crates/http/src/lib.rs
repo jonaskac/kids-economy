@@ -9,6 +9,7 @@ mod error;
 mod families;
 mod invitations;
 mod users;
+mod wallets;
 
 pub use auth::{Passwords, SESSION_COOKIE};
 pub use error::ApiError;
@@ -75,6 +76,26 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/families/{family_id}/kids/{kid_id}/archive",
             post(families::archive_kid),
+        )
+        .route(
+            "/api/families/{family_id}/wallets/{wallet_id}",
+            get(wallets::view),
+        )
+        .route(
+            "/api/families/{family_id}/wallets/{wallet_id}/deposits",
+            post(wallets::deposit),
+        )
+        .route(
+            "/api/families/{family_id}/wallets/{wallet_id}/withdrawals",
+            post(wallets::withdraw),
+        )
+        .route(
+            "/api/families/{family_id}/wallets/{wallet_id}/transfers",
+            post(wallets::transfer),
+        )
+        .route(
+            "/api/families/{family_id}/wallets/{wallet_id}/accounts",
+            post(wallets::open_account),
         )
         .route("/api/invitations/{secret}", get(invitations::preview))
         .route(
