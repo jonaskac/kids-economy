@@ -1,0 +1,12 @@
+# Keep the build context small and free of local secrets.
+.git
+.github
+**/node_modules
+**/dist
+**/target
+**/coverage
+.env
+.env.*
+docs
+*.md
+!apps/web/**/*.md

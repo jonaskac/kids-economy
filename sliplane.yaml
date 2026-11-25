@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=https://sliplane.opendeploy.cloud/schema/v1.json
+# One-click install on Sliplane, read by the "Deploy to Sliplane" button in README.md.
+# The button opens Sliplane Deployer, which creates everything below in your own
+# Sliplane account. Walkthrough and custom domains: docs/deploy.md (ADR-0014).
+version: 1
+
+app:
+  name: Kids Economy
+  description: Pretend Wallets for your kids. Record money in and out and show them a bank-style history.
+  docs: https://github.com/jonaskac/kids-economy/blob/main/docs/deploy.md
+  source: https://github.com/jonaskac/kids-economy
+
+server:
+  minimum: starter
+  recommended: starter
+  shared: true
+
+databases:
+  db:
+    engine: postgres
+    version: 16
+    database: kids_economy
+
+services:
+  kids-economy:
+    # Published by .github/workflows/release.yml: a release vX.Y.Z is tag X.Y.Z,
+    # and without a release the deployer uses `main`, which is tag `edge`.
+    image: ghcr.io/jonaskac/kids-economy:${{ release.version }}
+    public: true
+    port: 8080
+    healthcheck: /api/health
+    env:
+      PORT: "8080"
+      RUST_LOG: info
+      # The server waits for Postgres and runs migrations before it accepts traffic.
+      DATABASE_URL: ${{ databases.db.url }}
+
+done:
+  open: ${{ services.kids-economy.url }}
+  message: |
+    Kids Economy is running with HTTPS at ${{ services.kids-economy.url }}.
+    Tap "Create an account", then "Start a Family" and add your Kids. You are the Family's Owner,
+    and you invite the other grown-ups from Family settings.
+    To use your own domain, add it in Sliplane under the service's Domains tab (see docs/deploy.md).

@@ -196,3 +196,12 @@ logins per Family with Roles, and several Accounts per Kid inside one Wallet.
 : Saving a decision when the Wallet has moved past the Version it was decided on (another
   Member recorded something first). Nothing is saved; the Command is decided again against
   the fresh Wallet. *Avoid:* race, collision (in code).
+
+**Install**
+: One running copy of Kids Economy with its own database, set up by whoever hosts it
+  (for example from the "Deploy to Sliplane" button). Families on different Installs never
+  see each other. *Avoid:* instance, tenant (in code).
+
+**Release**
+: A published, numbered version of the app (`v0.1.0`), shipped as one container image that
+  every Install runs. An Install upgrades by moving to a newer Release; migrations run on start.
