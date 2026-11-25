@@ -1,0 +1,39 @@
+/*
+ * Kids Economy theme for Tailwind CSS v4. Import once in an app:
+ *   @import "tailwindcss";
+ *   @import "@kids-economy/design-system/theme.css";
+ * Values mirror src/tokens.ts (v0 placeholders).
+ */
+@theme {
+  --color-surface: #ffffff;
+  --color-ink: #1d1f24;
+  --color-muted: #5b5f6a;
+  --color-line: #e4e5e9;
+  --color-brand: #2f6fde;
+  --color-on-brand: #ffffff;
+  --color-money-in: #1d7a3a;
+  --color-money-out: #b3261e;
+
+  --radius-control: 12px;
+  --radius-card: 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface: #15161a;
+    --color-ink: #f4f4f5;
+    --color-muted: #a9acb5;
+    --color-line: #2c2e35;
+    --color-brand: #7aa7ff;
+    --color-on-brand: #0d1b33;
+    --color-money-in: #6fd38f;
+    --color-money-out: #f2a39d;
+  }
+}
+
+@layer base {
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+  }
+}

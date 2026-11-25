@@ -1,0 +1,3 @@
+@import "tailwindcss";
+@import "@kids-economy/design-system/theme.css";
+@source "../../../packages/design-system/src";
