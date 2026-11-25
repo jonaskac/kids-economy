@@ -15,7 +15,9 @@ pub use account::{Account, SavingsGoal};
 pub use command::{Context, OpenWallet, WalletCommand};
 pub use error::{ReplayError, WalletError};
 pub use event::WalletEvent;
-pub use transaction::{Category, DepositCategory, Direction, Transaction, WithdrawalCategory};
+pub use transaction::{
+    Category, DepositCategory, Direction, Transaction, TransactionParts, WithdrawalCategory,
+};
 
 use crate::ids::{AccountId, FamilyId, KidId, NewIds, TransactionId, TransferId, WalletId};
 use crate::money::{Amount, Balance, Currency};

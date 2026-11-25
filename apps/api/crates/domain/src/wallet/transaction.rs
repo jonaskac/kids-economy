@@ -88,7 +88,72 @@ pub struct Transaction {
     pub(super) corrects: Option<TransactionId>,
 }
 
+/// Every field of a Transaction, in the open. For adapters that store and read back a
+/// History: a restored Transaction is trusted only after [`super::Wallet::replay`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransactionParts {
+    pub id: TransactionId,
+    pub account_id: AccountId,
+    pub direction: Direction,
+    pub amount: Amount,
+    pub category: Category,
+    pub memo: Memo,
+    pub occurred_on: Date,
+    pub recorded_at: OffsetDateTime,
+    pub actor: MemberId,
+    pub transfer_id: Option<TransferId>,
+    pub corrects: Option<TransactionId>,
+}
+
 impl Transaction {
+    /// Rebuilds a Transaction read back from storage. New Transactions are only ever
+    /// made by the Wallet's decisions.
+    pub fn restore(parts: TransactionParts) -> Self {
+        let TransactionParts {
+            id,
+            account_id,
+            direction,
+            amount,
+            category,
+            memo,
+            occurred_on,
+            recorded_at,
+            actor,
+            transfer_id,
+            corrects,
+        } = parts;
+        Self {
+            id,
+            account_id,
+            direction,
+            amount,
+            category,
+            memo,
+            occurred_on,
+            recorded_at,
+            actor,
+            transfer_id,
+            corrects,
+        }
+    }
+
+    /// All fields, for storing.
+    pub fn parts(&self) -> TransactionParts {
+        TransactionParts {
+            id: self.id,
+            account_id: self.account_id,
+            direction: self.direction,
+            amount: self.amount,
+            category: self.category,
+            memo: self.memo.clone(),
+            occurred_on: self.occurred_on,
+            recorded_at: self.recorded_at,
+            actor: self.actor,
+            transfer_id: self.transfer_id,
+            corrects: self.corrects,
+        }
+    }
+
     pub const fn id(&self) -> TransactionId {
         self.id
     }

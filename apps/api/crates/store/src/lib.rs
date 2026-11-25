@@ -1,3 +1,16 @@
-//! Postgres adapter: JSONB `documents` and the append-only `ledger_events` (ADR-0005).
+//! Postgres adapter: each Wallet's History in the append-only `ledger_events` table,
+//! numbered per Wallet (ADR-0005, ADR-0009).
 //!
-//! Filled in roadmap step 4, test-first against real Postgres via `#[sqlx::test]`.
+//! Tested against real Postgres via `#[sqlx::test]` in `tests/`.
+
+pub mod body;
+mod error;
+mod version;
+mod wallet_store;
+
+pub use error::StoreError;
+pub use version::Version;
+pub use wallet_store::{LoadedWallet, WalletStore};
+
+/// The schema migrations in `migrations/`, embedded in the binary.
+pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!();

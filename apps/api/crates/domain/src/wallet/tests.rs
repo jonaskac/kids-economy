@@ -785,3 +785,31 @@ impl Fixture {
         }
     }
 }
+
+// ---------- Restoring stored Transactions ----------
+
+#[test]
+fn a_stored_transaction_is_restored_exactly() {
+    let mut fx = Fixture::new();
+    let events = fx.deposit(None, kr(20)).expect("deposit");
+    let WalletEvent::TransactionRecorded { transaction } = &events[0] else {
+        panic!("unexpected events {events:?}");
+    };
+
+    let restored = Transaction::restore(TransactionParts {
+        id: transaction.id(),
+        account_id: transaction.account_id(),
+        direction: transaction.direction(),
+        amount: transaction.amount(),
+        category: transaction.category(),
+        memo: transaction.memo().clone(),
+        occurred_on: transaction.occurred_on(),
+        recorded_at: transaction.recorded_at(),
+        actor: transaction.actor(),
+        transfer_id: transaction.transfer_id(),
+        corrects: transaction.corrects(),
+    });
+
+    assert_eq!(&restored, transaction);
+    assert_eq!(restored.parts(), transaction.parts());
+}

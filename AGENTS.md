@@ -67,8 +67,9 @@ pnpm -r lint
 pnpm -r test
 pnpm -r build
 
-# Rust (from apps/api)
+# Rust (from apps/api). Store tests need a Postgres they may create databases on.
 cd apps/api
+$env.DATABASE_URL = "postgres://postgres:postgres@localhost:5432/postgres"
 cargo fmt --all --check
 cargo clippy --all-targets -- -D warnings
 cargo test
