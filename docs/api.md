@@ -54,6 +54,35 @@ Families, Invitations and Kids (ADR-0010, ADR-0011).
 `members` lists active Members; `invitations` lists pending ones and is empty for
 non-Owners; `kids` lists active Kids.
 
+## Wallets
+
+Each active Kid has one Wallet. Every route below sits under
+`/api/families/{id}/wallets/{wallet_id}`, answers `404 wallet_not_found` for a Wallet that
+is not an active Kid's in this Family, and every change answers `201 WalletView`. Viewers
+read; changes by a Viewer answer `403 not_allowed`. Dates are `YYYY-MM-DD` and default to today.
+
+| Method and path | Body | Errors |
+| --- | --- | --- |
+| 🔒 `GET …/{wallet_id}` | | |
+| 🔒 `POST …/deposits` | `{account_id?, amount, category, memo, occurred_on?}`; `category` is `allowance`, `chore`, `gift` or `interest`; no `account_id` means the Main account | `422 invalid_amount`, `currency_mismatch`, `invalid_text`, `invalid_date`; `404 unknown_account` |
+| 🔒 `POST …/withdrawals` | `{account_id, amount, category, memo, occurred_on?}`; `category` is `purchase` or `donation` | as above, plus `422 insufficient_funds` (no Overdraft) |
+| 🔒 `POST …/transfers` | `{from, to, amount, memo, occurred_on?}` | as above, plus `422 same_account` |
+| 🔒 `POST …/accounts` | `{name, savings_goal?: {name, target, target_date?}}` | `422 invalid_text`, `currency_mismatch` |
+
+```json
+{
+  "id": "…", "kid": { "id": "…", "name": "Elsa" }, "currency": "SEK",
+  "total": { "minor": 3000, "currency": "SEK" },
+  "accounts": [{ "id": "…", "name": "Main", "main": true, "balance": { "minor": 2000, "currency": "SEK" }, "savings_goal": null }],
+  "transactions": [{ "id": "…", "account_id": "…", "direction": "in", "amount": { "minor": 3000, "currency": "SEK" },
+    "category": "gift", "memo": "From mormor", "occurred_on": "2026-11-25", "recorded_at": "2026-11-25T13:00:00Z",
+    "transfer_id": null, "corrects": null }]
+}
+```
+
+`accounts` lists open Accounts, Main first. `transactions` lists every Transaction on every
+Account, newest first; the two sides of a Transfer share a `transfer_id`.
+
 ## Invitation links
 
 The `link` returned when inviting is `/join/<secret>`, shown once. The web app's `/join/<secret>`
