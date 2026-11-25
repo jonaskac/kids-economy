@@ -104,8 +104,8 @@ pub struct InvitationDto {
 
 #[derive(Debug, Serialize)]
 pub struct MoneyDto {
-    minor: i64,
-    currency: String,
+    pub(crate) minor: i64,
+    pub(crate) currency: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -341,7 +341,7 @@ pub(crate) fn person(user: &User) -> Person {
 }
 
 /// Loads a Family the User is an active Member of; 404 for everyone else.
-async fn load_as_member(
+pub(crate) async fn load_as_member(
     state: &AppState,
     family_id: Uuid,
     user: &User,

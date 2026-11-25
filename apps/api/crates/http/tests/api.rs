@@ -644,3 +644,200 @@ async fn a_viewer_cannot_add_kids_and_a_parent_archives_them(pool: PgPool) {
     let view = app.get(&format!("/api/families/{family}"), &owner).await;
     assert_eq!(view.json["kids"], json!([]));
 }
+
+// ---------- Wallets ----------
+
+const SEK: &str = "SEK";
+
+fn sek(minor: i64) -> Value {
+    json!({ "minor": minor, "currency": SEK })
+}
+
+/// Adds a Kid and returns the path of their Wallet.
+async fn kid_wallet(app: &App, cookie: &str, family: &str, name: &str) -> String {
+    let added = app
+        .post(
+            &format!("/api/families/{family}/kids"),
+            cookie,
+            json!({ "name": name }),
+        )
+        .await;
+    assert_eq!(added.status, StatusCode::CREATED, "{}", added.json);
+    let wallet = added.json["wallet_id"].as_str().expect("wallet_id");
+    format!("/api/families/{family}/wallets/{wallet}")
+}
+
+fn account_named<'a>(wallet: &'a Value, name: &str) -> &'a Value {
+    wallet["accounts"]
+        .as_array()
+        .expect("accounts")
+        .iter()
+        .find(|a| a["name"] == name)
+        .expect("the Account")
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn a_new_wallet_shows_the_kid_and_an_empty_main_account(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+
+    let view = app.get(&wallet, &owner).await;
+    assert_eq!(view.status, StatusCode::OK, "{}", view.json);
+    assert_eq!(view.json["kid"]["name"], "Elsa");
+    assert_eq!(view.json["total"], sek(0));
+    let main = account_named(&view.json, "Main");
+    assert_eq!(main["main"], true);
+    assert_eq!(main["balance"], sek(0));
+    assert_eq!(view.json["transactions"], json!([]));
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn a_deposit_lands_on_the_main_account_and_in_the_family_total(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+
+    let deposited = app
+        .post(
+            &format!("{wallet}/deposits"),
+            &owner,
+            json!({ "amount": sek(2000), "category": "allowance", "memo": "Pocket money" }),
+        )
+        .await;
+    assert_eq!(deposited.status, StatusCode::CREATED, "{}", deposited.json);
+    assert_eq!(deposited.json["total"], sek(2000));
+    let row = &deposited.json["transactions"][0];
+    assert_eq!(row["direction"], "in");
+    assert_eq!(row["amount"], sek(2000));
+    assert_eq!(row["category"], "allowance");
+    assert_eq!(row["memo"], "Pocket money");
+    assert!(row["occurred_on"].is_string());
+
+    let family_view = app.get(&format!("/api/families/{family}"), &owner).await;
+    assert_eq!(family_view.json["kids"][0]["wallet_total"], sek(2000));
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn moving_money_to_a_savings_account_keeps_the_total(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+
+    let opened = app
+        .post(
+            &format!("{wallet}/accounts"),
+            &owner,
+            json!({ "name": "Savings", "savings_goal": { "name": "Lego set", "target": sek(50000) } }),
+        )
+        .await;
+    assert_eq!(opened.status, StatusCode::CREATED, "{}", opened.json);
+    let savings = account_named(&opened.json, "Savings");
+    assert_eq!(savings["main"], false);
+    assert_eq!(savings["savings_goal"]["name"], "Lego set");
+    assert_eq!(savings["savings_goal"]["target"], sek(50000));
+    let savings_id = savings["id"].clone();
+    let main_id = account_named(&opened.json, "Main")["id"].clone();
+
+    app.post(
+        &format!("{wallet}/deposits"),
+        &owner,
+        json!({ "amount": sek(3000), "category": "gift", "memo": "From mormor" }),
+    )
+    .await;
+    let moved = app
+        .post(
+            &format!("{wallet}/transfers"),
+            &owner,
+            json!({ "from": main_id, "to": savings_id, "amount": sek(1000), "memo": "For the Lego" }),
+        )
+        .await;
+    assert_eq!(moved.status, StatusCode::CREATED, "{}", moved.json);
+    assert_eq!(moved.json["total"], sek(3000));
+    assert_eq!(account_named(&moved.json, "Main")["balance"], sek(2000));
+    assert_eq!(account_named(&moved.json, "Savings")["balance"], sek(1000));
+    let rows = moved.json["transactions"].as_array().expect("rows");
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows[0]["category"], "transfer");
+    assert_eq!(rows[1]["category"], "transfer");
+    assert_eq!(rows[0]["transfer_id"], rows[1]["transfer_id"]);
+    assert!(rows[0]["transfer_id"].is_string());
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn a_withdrawal_never_overdraws_an_account(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+    let view = app.get(&wallet, &owner).await;
+    let main_id = account_named(&view.json, "Main")["id"].clone();
+    app.post(
+        &format!("{wallet}/deposits"),
+        &owner,
+        json!({ "amount": sek(3000), "category": "chore", "memo": "Washed the car" }),
+    )
+    .await;
+
+    let refused = app
+        .post(
+            &format!("{wallet}/withdrawals"),
+            &owner,
+            json!({ "account_id": main_id, "amount": sek(5000), "category": "purchase", "memo": "Bike" }),
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(refused.json["error"], "insufficient_funds");
+
+    let spent = app
+        .post(
+            &format!("{wallet}/withdrawals"),
+            &owner,
+            json!({ "account_id": main_id, "amount": sek(500), "category": "purchase", "memo": "Ice cream" }),
+        )
+        .await;
+    assert_eq!(spent.status, StatusCode::CREATED, "{}", spent.json);
+    assert_eq!(spent.json["total"], sek(2500));
+    assert_eq!(spent.json["transactions"][0]["direction"], "out");
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn a_viewer_sees_a_wallet_but_cannot_change_it(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+    let viewer = app
+        .join(&owner, &family, "mormor@example.com", "viewer")
+        .await;
+
+    assert_eq!(app.get(&wallet, &viewer).await.status, StatusCode::OK);
+    let refused = app
+        .post(
+            &format!("{wallet}/deposits"),
+            &viewer,
+            json!({ "amount": sek(100), "category": "gift", "memo": "Hi" }),
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert_eq!(refused.json["error"], "not_allowed");
+}
+
+#[sqlx::test(migrator = "store::MIGRATOR")]
+async fn a_wallet_is_invisible_outside_its_family(pool: PgPool) {
+    let app = App::new(pool);
+    let (owner, family) = app.family().await;
+    let wallet = kid_wallet(&app, &owner, &family, "Elsa").await;
+    let stranger = app.sign_up("stranger@example.com", "Stranger").await;
+
+    let hidden = app.get(&wallet, &stranger).await;
+    assert_eq!(hidden.status, StatusCode::NOT_FOUND);
+    assert_eq!(hidden.json["error"], "family_not_found");
+
+    let unknown = app
+        .get(
+            &format!("/api/families/{family}/wallets/00000000-0000-0000-0000-000000000000"),
+            &owner,
+        )
+        .await;
+    assert_eq!(unknown.status, StatusCode::NOT_FOUND);
+    assert_eq!(unknown.json["error"], "wallet_not_found");
+}
