@@ -1,0 +1,13 @@
+[package]
+name = "store"
+description = "Postgres adapter implementing the domain ports (ADR-0005)."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+domain.workspace = true
+
+[lints]
+workspace = true

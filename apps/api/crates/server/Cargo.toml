@@ -1,0 +1,17 @@
+[package]
+name = "server"
+description = "Binary: reads config from the environment and serves the API."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+kids-http.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

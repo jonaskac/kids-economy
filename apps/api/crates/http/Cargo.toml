@@ -1,0 +1,23 @@
+[package]
+name = "kids-http"
+description = "axum routes, DTOs and auth for the Kids Economy API."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lib]
+name = "kids_http"
+
+[dependencies]
+axum.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+tower.workspace = true
+http-body-util.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

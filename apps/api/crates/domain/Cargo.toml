@@ -1,0 +1,10 @@
+[package]
+name = "domain"
+description = "Pure domain model: aggregates, invariants and events. No IO."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
