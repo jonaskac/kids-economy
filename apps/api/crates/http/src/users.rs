@@ -130,7 +130,7 @@ pub async fn me(State(state): State<AppState>, signed_in: SignedIn) -> Result<Js
     }))
 }
 
-async fn signed_in(
+pub(crate) async fn signed_in(
     state: &AppState,
     status: StatusCode,
     user: &User,

@@ -23,6 +23,12 @@ pub enum ApiError {
     FamilyNotFound,
     #[error("no such Wallet in this Family")]
     WalletNotFound,
+    #[error("no such password reset link")]
+    UnknownPasswordReset,
+    #[error("this password reset link was already used")]
+    PasswordResetUsed,
+    #[error("this password reset link has expired; ask an Owner for a new one")]
+    PasswordResetExpired,
     #[error("the date is not YYYY-MM-DD")]
     InvalidDate,
     #[error("someone else changed this at the same time; try again")]
@@ -48,6 +54,7 @@ impl From<StoreError> for ApiError {
         match error {
             StoreError::Conflict => ApiError::Conflict,
             StoreError::EmailTaken => ApiError::EmailTaken,
+            StoreError::PasswordResetNotPending => ApiError::PasswordResetUsed,
             other => {
                 tracing::error!(error = %other, "store failed");
                 ApiError::Internal
@@ -65,6 +72,9 @@ impl ApiError {
             ApiError::EmailTaken => (S::CONFLICT, "email_taken"),
             ApiError::FamilyNotFound => (S::NOT_FOUND, "family_not_found"),
             ApiError::WalletNotFound => (S::NOT_FOUND, "wallet_not_found"),
+            ApiError::UnknownPasswordReset => (S::NOT_FOUND, "unknown_password_reset"),
+            ApiError::PasswordResetUsed => (S::CONFLICT, "password_reset_used"),
+            ApiError::PasswordResetExpired => (S::GONE, "password_reset_expired"),
             ApiError::InvalidDate => (S::UNPROCESSABLE_ENTITY, "invalid_date"),
             ApiError::Conflict => (S::CONFLICT, "conflict"),
             ApiError::Email(_) => (S::UNPROCESSABLE_ENTITY, "invalid_email"),

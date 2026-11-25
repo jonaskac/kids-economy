@@ -565,6 +565,58 @@ fn a_user_who_is_already_an_active_member_cannot_accept_another_invitation() {
     );
 }
 
+// ---------- Password reset links ----------
+
+#[test]
+fn an_owner_may_reset_the_password_of_an_active_member() {
+    let mut f = Fixture::new();
+    let grandma = person(2, "mormor@example.com");
+    let viewer = f.join(&grandma, Role::Viewer);
+    let member = f
+        .family
+        .member_for_password_reset(f.owner(), viewer.member_id)
+        .expect("allowed");
+    assert_eq!(member.user_id, grandma.user_id);
+}
+
+#[test]
+fn only_an_owner_may_reset_passwords() {
+    let mut f = Fixture::new();
+    let parent = f.join(&person(2, "parent@example.com"), Role::Parent);
+    let viewer = f.join(&person(3, "mormor@example.com"), Role::Viewer);
+    assert_eq!(
+        f.family
+            .member_for_password_reset(parent, viewer.member_id)
+            .map(|m| m.id),
+        Err(FamilyError::NotAllowed)
+    );
+}
+
+#[test]
+fn a_removed_or_unknown_member_gets_no_password_reset() {
+    let mut f = Fixture::new();
+    let viewer = f.join(&person(2, "mormor@example.com"), Role::Viewer);
+    let owner = f.owner();
+    f.decide(
+        owner,
+        FamilyCommand::RemoveMember {
+            member_id: viewer.member_id,
+        },
+    );
+    assert_eq!(
+        f.family
+            .member_for_password_reset(owner, viewer.member_id)
+            .map(|m| m.id),
+        Err(FamilyError::UnknownMember)
+    );
+    assert_eq!(
+        f.family
+            .member_for_password_reset(owner, MemberId::from_uuid(Uuid::from_u128(77)))
+            .map(|m| m.id),
+        Err(FamilyError::UnknownMember)
+    );
+}
+
 // ---------- Kids ----------
 
 #[test]

@@ -186,6 +186,19 @@ impl Family {
             })
     }
 
+    /// The Member an Owner may make a Password reset link for: any active Member.
+    /// Nothing is recorded in the Family; the link lives with the User (ADR-0012).
+    pub fn member_for_password_reset(
+        &self,
+        actor: Actor,
+        member_id: MemberId,
+    ) -> Result<&Member, FamilyError> {
+        if !actor.role.may_manage_members() {
+            return Err(FamilyError::NotAllowed);
+        }
+        self.active_member(member_id)
+    }
+
     /// Checks `command` against the Family's rules and returns the events to record.
     pub fn decide(
         &self,
